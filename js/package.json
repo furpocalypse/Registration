@@ -1,8 +1,9 @@
 {
   "name": "@oes/registration",
   "version": "0.1.0",
-  "description": "",
+  "description": "OES registration web interface",
   "type": "module",
+  "license": "LGPL-3.0-or-later",
   "exports": {
     "./*": "./src/*"
   },
@@ -20,7 +21,7 @@
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build"
   },
-  "author": "",
+  "author": "Wes <wes@anthronewengland.com>",
   "devDependencies": {
     "@babel/core": "^7.21.4",
     "@babel/plugin-transform-runtime": "^7.21.4",

@@ -972,6 +972,7 @@ url = "https://github.com/Open-Event-Systems/interview.git"
 reference = "main"
 resolved_reference = "7521f2b04e1af8c0b6d6070bbd415c56c5cd9430"
 subdirectory = "python"
+
 [[package]]
 name = "oes-template"
 version = "0.2.0"
@@ -1918,4 +1919,4 @@ stripe = ["stripe"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.11"
-content-hash = "39bf94b00d12eff09334dd8a15f4551f15ab9579c16c78b349bb3cbdaa9c5679"
+content-hash = "11fc420657cc0ac77c63f10abac48b19386d7935a698218a964d6eaaf2040af7"

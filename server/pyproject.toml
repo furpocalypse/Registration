@@ -1,15 +1,18 @@
 [tool.poetry]
 name = "oes-registration"
 version = "0.1.0"
-description = ""
-authors = []
+description = "OES registration HTTP API"
+license = "AGPL-3.0-or-later"
+authors = [
+    "Wes <wes@anthronewengland.com>"
+]
 packages = [
     { include = "oes", from = "src" }
 ]
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.11"
-sqlalchemy = "^2.0.5.post1"
+sqlalchemy = "^2.0.5"
 psycopg2-binary = "^2.9.5"
 attrs = "^22.2.0"
 cattrs = "^22.2.0"
@@ -22,16 +25,16 @@ loguru = "^0.7.0"
 blacksheep = "^1.2.12"
 uvicorn = {extras = ["standard"], version = "^0.21.1"}
 httpx = "^0.24.0"
+importlib-metadata = "^6.4.1"
+webauthn = "^1.8.1"
 
 # TODO: proper versioning of this
 oes-template = { git = "https://github.com/Open-Event-Systems/template.git", branch = "main" }
 oes-hook = { git = "https://github.com/Open-Event-Systems/hook.git", branch = "main" }
 oes-interview = { git = "https://github.com/Open-Event-Systems/interview.git", branch = "main", subdirectory = "python" }
-importlib-metadata = "^6.4.1"
 
 # Payment services
 stripe = {version = "^5.4.0", optional = true}
-webauthn = "^1.8.1"
 
 
 [tool.poetry.group.dev.dependencies]
