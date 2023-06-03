@@ -1,0 +1,63 @@
+[tool.poetry]
+name = "oes-registration"
+version = "0.1.0"
+description = ""
+authors = []
+packages = [
+    { include = "oes", from = "src" }
+]
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.11"
+sqlalchemy = "^2.0.5.post1"
+psycopg2-binary = "^2.9.5"
+attrs = "^22.2.0"
+cattrs = "^22.2.0"
+orjson = "^3.8.9"
+pyjwt = "^2.6.0"
+asyncpg = "^0.27.0"
+jinja2 = "^3.1.2"
+ruamel-yaml = "^0.17.21"
+loguru = "^0.7.0"
+blacksheep = "^1.2.12"
+uvicorn = {extras = ["standard"], version = "^0.21.1"}
+httpx = "^0.24.0"
+
+# TODO: proper versioning of this
+oes-template = { git = "https://github.com/Open-Event-Systems/template.git", branch = "main" }
+oes-hook = { git = "https://github.com/Open-Event-Systems/hook.git", branch = "main" }
+oes-interview = { git = "https://github.com/Open-Event-Systems/interview.git", branch = "main", subdirectory = "python" }
+importlib-metadata = "^6.4.1"
+
+# Payment services
+stripe = {version = "^5.4.0", optional = true}
+webauthn = "^1.8.1"
+
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^7.2.2"
+coverage = "^7.2.2"
+pytest-cov = "^4.0.0"
+pytest-asyncio = "^0.21.0"
+
+
+[tool.poetry.extras]
+stripe = ["stripe"]
+
+
+[tool.poetry.plugins."oes.registration.payment_services"]
+stripe = "oes.registration.payment.stripe:create_stripe_service"
+mock = "oes.registration.payment.mock:create_mock_service"
+
+[tool.poetry.scripts]
+oes-registration = "oes.registration.app:run"
+
+[tool.mypy]
+python_version = "3.9"
+namespace_packages = true
+explicit_package_bases = true
+mypy_path = "$MYPY_CONFIG_FILE_DIR/src"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

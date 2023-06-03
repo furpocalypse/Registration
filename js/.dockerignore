@@ -1,0 +1,9 @@
+**/*
+!package.json
+!package-lock.json
+!src
+!interview
+!extra
+!webpack.config.cjs
+!.babelrc.json
+!config.json

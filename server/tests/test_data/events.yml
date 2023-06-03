@@ -1,0 +1,32 @@
+---
+- id: example-event
+  name: Example Event
+  description: |
+    An example event.
+  date: 2024-07-04
+  open: true
+  visible: true
+  registration_options:
+    - id: attendee
+      name: Attendee
+      description: Attendee level
+    - id: vip
+      name: VIP
+      description: VIP upgrade
+  pricing_rules:
+    - name: Attendee Registration
+      description: Attendee level registration
+      price: 5000
+      modifiers:
+        - type_id: early-bird
+          name: Early Bird Discount
+          amount: -500
+          when: true
+      when:
+        - "'attendee' in added_option_ids"
+
+    - name: VIP Upgrade
+      description: VIP level upgrade
+      price: 2500
+      when:
+        - "'vip' in added_option_ids"

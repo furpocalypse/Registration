@@ -1,0 +1,40 @@
+---
+# Example config file
+
+# Database configuration
+database:
+  # The database URL
+  url: postgresql+asyncpg://localhost/oes
+
+# Auth settings
+auth:
+  # Key used to sign auth tokens
+  signing_key: changeit
+
+  # Origins that are allowed to access API endpoints
+  allowed_origins:
+    - http://localhost:9000
+    - http://localhost:8000
+
+  # Origins that are allowed to use first-party auth endpoints
+  allowed_auth_origins:
+    - http://localhost:9000
+    - http://localhost:8000
+
+  # The name of this service
+  name: Registration
+
+# Payment settings
+payment:
+  # The currency code
+  currency: USD
+
+  # Payment service configuration
+  services:
+
+# Interview config
+interview:
+  encryption_key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
+
+  # The URL of the interview service's update endpoint
+  update_url: http://localhost:8001/update
