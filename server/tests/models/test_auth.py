@@ -17,6 +17,7 @@ def test_token_encode_decode():
     now = get_now(seconds_only=True)
     exp = now + timedelta(seconds=30)
     token = AccessToken(
+        typ="at",
         iss=ISSUER,
         aud=AUDIENCE,
         sub="test",
@@ -35,6 +36,7 @@ def test_token_different_key_error():
     now = get_now(seconds_only=True)
     exp = now + timedelta(seconds=30)
     token = AccessToken(
+        typ="at",
         iss=ISSUER,
         aud=AUDIENCE,
         sub="test",
@@ -52,7 +54,7 @@ def test_token_different_key_error():
         {"iss": "wrong"},
         {"aud": "wrong"},
         {"exp": datetime.fromtimestamp(0, tz=timezone.utc)},
-        {"exp": None},
+        {"typ": "rt"},
     ],
 )
 def test_token_validation_errors(props):
@@ -61,6 +63,7 @@ def test_token_validation_errors(props):
     with pytest.raises(InvalidTokenError):
         token = AccessToken(
             **{
+                "typ": "at",
                 "sub": "test",
                 "iat": now,
                 "exp": exp,
@@ -75,13 +78,22 @@ def test_token_validation_errors(props):
 
 def test_has_scope():
     exp = get_now(seconds_only=True) + timedelta(seconds=30)
-    token1 = AccessToken(exp=exp, scope=Scopes(frozenset({Scope.self_service})))
+    token1 = AccessToken(
+        typ="at",
+        exp=exp,
+        scope=Scopes(frozenset({Scope.self_service})),
+        aud=AUDIENCE,
+        iss=ISSUER,
+    )
 
     assert token1.has_scope(Scope.self_service)
     assert not token1.has_scope(Scope.admin)
 
     token2 = AccessToken(
+        typ="at",
         exp=exp,
+        aud=AUDIENCE,
+        iss=ISSUER,
         scope=Scopes(
             frozenset(
                 {
@@ -100,6 +112,7 @@ def test_parsing():
     exp = now + timedelta(seconds=30)
 
     token_data = {
+        "typ": "at",
         "iss": ISSUER,
         "aud": AUDIENCE,
         "exp": int(exp.timestamp()),
@@ -108,6 +121,7 @@ def test_parsing():
 
     loaded = converter.structure(token_data, AccessToken)
     assert loaded == AccessToken(
+        typ="at",
         iss=ISSUER,
         aud=AUDIENCE,
         exp=exp,

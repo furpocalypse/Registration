@@ -77,17 +77,22 @@ def structure_sequence(c, v, t):
     return c.structure(v, Tuple[args[0], ...])
 
 
-def structure_without_cast(v, t):
+def structure_without_cast(v, t):  # noqa: CCR001
     """Structure a type without attempting to cast the value."""
-    if isinstance(v, t):
+    # case for the correct type
+    if t is bool and isinstance(v, bool) or t is not bool and isinstance(v, t):
         return v
+
+    # case for acceptable casts
     elif (
         issubclass(t, (int, float))
+        and t is not bool
         and isinstance(v, (int, float))
         or issubclass(t, Enum)
         and isinstance(v, (int, str))
     ):
         return t(v)
+
     else:
         raise TypeError(f"Invalid type: {v!r}")
 
