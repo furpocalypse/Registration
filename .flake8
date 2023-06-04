@@ -1,0 +1,12 @@
+[flake8]
+max-line-length = 88
+docstring-convention = google
+suppress-none-returning = true
+suppress-dummy-args = true
+allow-untyped-defs = true
+allow-untyped-nested = true
+mypy-init-return = true
+
+extend-ignore = ANN101,NN102,ANN202
+
+per-file-ignores = **/tests/**: D,ANN,NEW
