@@ -16,6 +16,8 @@ from oes.registration.views.responses import AccessCodeListResponse, AccessCodeR
 
 @frozen
 class CreateAccessCodeRequest:
+    """Request body for creating an access code."""
+
     event_id: str
     date_expires: datetime
     name: Optional[str]
@@ -30,7 +32,7 @@ class CreateAccessCodeRequest:
 )
 async def list_access_codes(
     service: AccessCodeService, event_id: Optional[str], page: int, per_page: int
-):
+) -> list[AccessCodeListResponse]:
     """List access codes."""
     # TODO: permissions
     results = await service.list_access_codes(
@@ -58,7 +60,7 @@ async def list_access_codes(
 async def create_access_code(
     service: AccessCodeService,
     body: AttrsBody[CreateAccessCodeRequest],
-):
+) -> AccessCodeResponse:
     """Create an access code."""
     create = body.value
     result = await service.create_access_code(
@@ -74,7 +76,7 @@ async def create_access_code(
 @app.router.delete("/access-code/{code}")
 @docs(tags=["Access Code"])
 @transaction
-async def delete_access_code(service: AccessCodeService, code: str):
+async def delete_access_code(service: AccessCodeService, code: str) -> Response:
     """Delete an access code."""
     result = check_not_found(await service.get_access_code(code))
     await service.delete_access_code(result)

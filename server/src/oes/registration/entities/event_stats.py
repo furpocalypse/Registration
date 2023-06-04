@@ -5,7 +5,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 
 class EventStatsEntity(Base):
-    """Event stats"""
+    """Event stats."""
 
     __tablename__ = "event_stats"
 

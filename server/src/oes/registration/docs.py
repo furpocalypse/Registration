@@ -21,11 +21,15 @@ from openapidocs.v3 import (
     Security,
     SecurityRequirement,
 )
+from typing_extensions import ParamSpec
 
+P = ParamSpec("P")
 T = TypeVar("T")
 
 
 class Handler(OpenAPIHandler):
+    """Custom handler to set up security settings in the swagger UI."""
+
     def on_docs_generated(self, docs: OpenAPI):
         docs.security = Security(
             requirements=[
@@ -74,23 +78,23 @@ class AttrsTypeHandler(ObjectTypeHandler):
     def __init__(self, docs: OpenAPIHandler):
         self.docs = docs
 
-    def handles_type(self, object_type) -> bool:
+    def handles_type(self, object_type: object) -> bool:
         return hasattr(object_type, "__attrs_attrs__")
 
-    def get_schema(self, type_) -> Union[Schema, Reference]:
+    def get_schema(self, type_: Any) -> Union[Schema, Reference]:
         if type_ in self._no_register_types:
             return self.docs.get_schema_by_type(type_)
         else:
             return self.docs.register_schema_for_type(type_)
 
-    def is_optional(self, type_) -> bool:
+    def is_optional(self, type_: Any) -> bool:
         if get_origin(type_) is Union:
             args = get_args(type_)
             return len(args) == 2 and type(None) in args
         else:
             return False
 
-    def get_union_schema(self, type_) -> Schema:
+    def get_union_schema(self, type_: Any) -> Schema:
         args = get_args(type_)
         optional = type(None) in args
 
@@ -113,23 +117,14 @@ class AttrsTypeHandler(ObjectTypeHandler):
 
         return FieldInfo(field.name, type_)
 
-    def get_type_fields(self, object_type) -> list[FieldInfo]:
+    def get_type_fields(self, object_type: Any) -> list[FieldInfo]:
         return [self.get_field_info(field) for field in fields(object_type)]
 
 
 docs.object_types_handlers.append(AttrsTypeHandler(docs))
 
 
-def _get_serializer(type_: object) -> Callable[[object], Any]:
-    if isinstance(type_, type) or get_origin(type_) is not None:
-        return lambda v: get_converter().unstructure(v, unstructure_as=type_)
-    elif callable(type_):
-        return type_
-    else:
-        return lambda v: v
-
-
-def serialize(type_: T):
+def serialize(type_: T) -> Callable[[Callable[P, Any]], Callable[P, T]]:
     """Serialize the return value using the given type."""
     serializer = _get_serializer(type_)
 
@@ -153,13 +148,22 @@ def serialize(type_: T):
     return decorator
 
 
+def _get_serializer(type_: object) -> Callable[[object], Any]:
+    if isinstance(type_, type) or get_origin(type_) is not None:
+        return lambda v: get_converter().unstructure(v, unstructure_as=type_)
+    elif callable(type_):
+        return type_
+    else:
+        return lambda v: v
+
+
 def docs_helper(
     *,
     response_type: Optional[object] = None,
     response_summary: Optional[str] = None,
     tags: Optional[Sequence[str]] = None,
     auth: bool = True,
-):
+) -> Callable[[T], T]:
     """Decorate view handlers with documentation."""
     responses = {}
 

@@ -25,54 +25,8 @@ converter = CustomConverter()
 configure_common(converter)
 
 
-# Sequence[T] is structured as tuple[T, ...]
-def structure_sequence(c, v, t):
-    args = get_args(t)
-    return c.structure(v, Tuple[args[0], ...])
-
-
-def structure_without_cast(v, t):
-    """Structure a type without attempting to cast the value."""
-    if isinstance(v, t):
-        return v
-    elif (
-        issubclass(t, (int, float))
-        and isinstance(v, (int, float))
-        or issubclass(t, Enum)
-        and isinstance(v, (int, str))
-    ):
-        return t(v)
-    else:
-        raise TypeError(f"Invalid type: {v!r}")
-
-
-def _is_nullable(t):
-    origin = get_origin(t)
-    args = get_args(t)
-    return origin is Union and type(None) in args
-
-
-def make_unstructure_dict_omitting_none(c, t):
-    """Make an unstructure function that omits None."""
-
-    # Resolve types because some field types might just be strings
-    resolve_types(t)
-
-    nullable_fields = [f.name for f in fields(t) if _is_nullable(f.type)]
-
-    unstructure_fn = make_dict_unstructure_fn(t, c)
-
-    def unstructure(v):
-        dict_ = unstructure_fn(v)
-        for field in nullable_fields:
-            if field in dict_ and dict_[field] is None:
-                del dict_[field]
-        return dict_
-
-    return unstructure
-
-
 def configure_converter(c: Converter):
+    """Configure a converter to serializer user input."""
     for t in (float, int, bool, str):
         c.register_structure_hook(t, structure_without_cast)
 
@@ -114,6 +68,53 @@ def configure_converter(c: Converter):
             _cattrs_omit_if_default=True,
         ),
     )
+
+
+# Sequence[T] is structured as tuple[T, ...]
+def structure_sequence(c, v, t):
+    """Structure a :class:`Sequence` into a tuple."""
+    args = get_args(t)
+    return c.structure(v, Tuple[args[0], ...])
+
+
+def structure_without_cast(v, t):
+    """Structure a type without attempting to cast the value."""
+    if isinstance(v, t):
+        return v
+    elif (
+        issubclass(t, (int, float))
+        and isinstance(v, (int, float))
+        or issubclass(t, Enum)
+        and isinstance(v, (int, str))
+    ):
+        return t(v)
+    else:
+        raise TypeError(f"Invalid type: {v!r}")
+
+
+def make_unstructure_dict_omitting_none(c, t):
+    """Make an unstructure function that omits None."""
+    # Resolve types because some field types might just be strings
+    resolve_types(t)
+
+    nullable_fields = [f.name for f in fields(t) if _is_nullable(f.type)]
+
+    unstructure_fn = make_dict_unstructure_fn(t, c)
+
+    def unstructure(v):
+        dict_ = unstructure_fn(v)
+        for field in nullable_fields:
+            if field in dict_ and dict_[field] is None:
+                del dict_[field]
+        return dict_
+
+    return unstructure
+
+
+def _is_nullable(t):
+    origin = get_origin(t)
+    args = get_args(t)
+    return origin is Union and type(None) in args
 
 
 configure_converter(converter)

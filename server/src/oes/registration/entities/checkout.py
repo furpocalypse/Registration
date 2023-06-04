@@ -96,7 +96,6 @@ class CheckoutEntity(Base):
         Returns:
             Whether a change was made.
         """
-
         if self.state == CheckoutState.complete:
             return False
 

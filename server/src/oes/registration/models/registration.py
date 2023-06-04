@@ -87,8 +87,9 @@ STANDARD_FIELDS = frozenset(
 
 
 def structure_writable_registration(
-    converter: Converter, value
+    converter: Converter, value: Any
 ) -> WritableRegistration:
+    """Structure the writable fields of a registration."""
     if not isinstance(value, dict):
         raise TypeError(f"Invalid type: {value}")
 
@@ -115,7 +116,8 @@ def structure_writable_registration(
         raise ClassValidationError("Invalid Registration", [e], Registration)
 
 
-def structure_registration(converter: Converter, value) -> Registration:
+def structure_registration(converter: Converter, value: Any) -> Registration:
+    """Structure all fields of a registration."""
     if not isinstance(value, dict):
         raise TypeError(f"Invalid type: {value}")
 
@@ -142,6 +144,7 @@ def structure_registration(converter: Converter, value) -> Registration:
 def unstructure_registration(
     converter: Converter, value: Union[Registration, WritableRegistration]
 ) -> dict[str, Any]:
+    """Unstructure a registration."""
     data = converter.unstructure_attrs_asdict(value)
     final_data = {}
     for k, v in data["extra_data"].items():

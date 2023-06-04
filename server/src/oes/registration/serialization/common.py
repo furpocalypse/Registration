@@ -1,7 +1,7 @@
 """Common converters."""
 from datetime import date, datetime, timezone
 from pathlib import Path
-from typing import Type, TypeVar, Union
+from typing import Any, Type, TypeVar, Union
 from uuid import UUID
 
 from cattrs import Converter
@@ -13,7 +13,7 @@ T = TypeVar("T")
 class CustomConverter(Converter):
     """Converter that uses orjson."""
 
-    def dumps(self, obj: object, unstructure_as=None) -> bytes:
+    def dumps(self, obj: object, unstructure_as: Any = None) -> bytes:
         unstructured = self.unstructure(obj, unstructure_as)
         return json_dumps(unstructured)
 
@@ -23,6 +23,7 @@ class CustomConverter(Converter):
 
 
 def structure_datetime(v: object) -> datetime:
+    """Structure a datetime."""
     if isinstance(v, datetime):
         dt = v
     elif isinstance(v, (float, int)):
@@ -39,6 +40,7 @@ def structure_datetime(v: object) -> datetime:
 
 
 def structure_date(v: object) -> date:
+    """Structure a date."""
     if isinstance(v, date):
         return v
     elif isinstance(v, str):
@@ -48,6 +50,7 @@ def structure_date(v: object) -> date:
 
 
 def structure_uuid(v: object) -> UUID:
+    """Structure a UUID."""
     if isinstance(v, UUID):
         return v
     elif isinstance(v, str):
@@ -57,6 +60,7 @@ def structure_uuid(v: object) -> UUID:
 
 
 def structure_path(v: object) -> Path:
+    """Structure a path."""
     if isinstance(v, Path):
         return v
     elif isinstance(v, str):
@@ -76,6 +80,7 @@ structure_funcs = {
 
 
 def configure_converter(c: Converter):
+    """Configure the given :class:`Converter`."""
     for test_func, func in structure_funcs.items():
         c.register_structure_hook_func(test_func, func)
 

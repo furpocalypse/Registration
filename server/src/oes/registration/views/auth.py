@@ -34,12 +34,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 @frozen
 class TokenRequest:
+    """A token request."""
+
     grant_type: str
     refresh_token: str
 
 
 @frozen
 class CurrentAuthInfoResponse:
+    """The current authentication information for the user."""
+
     id: UUID
     email: Optional[str]
     scope: str
@@ -47,18 +51,24 @@ class CurrentAuthInfoResponse:
 
 @frozen
 class WebAuthChallengeResponse:
+    """A WebAuthn challenge."""
+
     challenge: str
     options: dict
 
 
 @frozen
 class CreateWebAuthnRegistrationRequest:
+    """Request body to create a webauthn registration."""
+
     challenge: str
     result: str
 
 
 @frozen
 class WebAuthnAuthenticationRequest:
+    """Request body to perform webauthn authentication."""
+
     challenge: str
     result: str
 
@@ -72,7 +82,7 @@ class WebAuthnAuthenticationRequest:
 )
 async def get_current_auth_info(
     user: Optional[User],
-):
+) -> CurrentAuthInfoResponse:
     """Get the current authentication information."""
     if user is None:
         # TODO: correct error response formats
@@ -96,13 +106,36 @@ async def get_current_auth_info(
 async def get_new_account(
     service: AuthService,
     config: Config,
-):
+) -> TokenResponse:
     """Get a new account."""
     token_response = await create_new_account(service, config)
     return token_response
 
 
-async def handle_refresh_token(
+@allow_anonymous()
+@app.router.post("/auth/token")
+@docs_helper(
+    response_type=TokenResponse,
+    response_summary="The token response",
+    tags=["Auth"],
+)
+async def get_token(
+    body: FromForm[TokenRequest],
+    service: AuthService,
+    config: Config,
+    db: AsyncSession,
+) -> TokenResponse:
+    """Get an access token."""
+    if body.value.grant_type == "refresh_token":
+        return await _handle_refresh_token(
+            service, config, db, body.value.refresh_token
+        )
+    else:
+        # TODO: correct error response formats
+        raise HTTPException(401)
+
+
+async def _handle_refresh_token(
     service: AuthService,
     config: Config,
     db: AsyncSession,
@@ -146,27 +179,6 @@ async def handle_refresh_token(
         return response
 
 
-@allow_anonymous()
-@app.router.post("/auth/token")
-@docs_helper(
-    response_type=TokenResponse,
-    response_summary="The token response",
-    tags=["Auth"],
-)
-async def get_token(
-    body: FromForm[TokenRequest],
-    service: AuthService,
-    config: Config,
-    db: AsyncSession,
-):
-    """Get an access token."""
-    if body.value.grant_type == "refresh_token":
-        return await handle_refresh_token(service, config, db, body.value.refresh_token)
-    else:
-        # TODO: correct error response formats
-        raise HTTPException(401)
-
-
 @app.router.get("/auth/webauthn/register")
 @docs(
     responses={
@@ -183,7 +195,7 @@ async def get_webauthn_challenge(
     service: AuthService,
     config: Config,
     user: User,
-):
+) -> WebAuthChallengeResponse:
     """Get a WebAuthn registration challenge."""
     account = await service.get_account(user.id, lock=True, with_credentials=True)
     if not account:
@@ -219,9 +231,8 @@ async def create_webauthn_registration(
     service: AuthService,
     config: Config,
     user: User,
-):
+) -> TokenResponse:
     """Create a WebAuthn registration."""
-
     origin = (request.get_first_header(b"Origin") or b"").decode()
 
     try:
@@ -266,7 +277,7 @@ async def get_webauthn_auth_challenge(
     credential_id: FromQuery[str],
     service: AuthService,
     config: Config,
-):
+) -> WebAuthChallengeResponse:
     """Get a WebAuthn authentication challenge."""
     origin = (request.get_first_header(b"Origin") or b"").decode()
 
@@ -299,7 +310,7 @@ async def complete_webauthn_auth_challenge(
     body: AttrsBody[WebAuthnAuthenticationRequest],
     service: AuthService,
     config: Config,
-):
+) -> TokenResponse:
     """Complete WebAuthn authentication."""
     origin = (request.get_first_header(b"Origin") or b"").decode()
 

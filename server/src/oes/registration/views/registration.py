@@ -31,6 +31,8 @@ from oes.registration.views.responses import RegistrationListResponse
 
 @frozen(kw_only=True)
 class CreateRegistrationRequest:
+    """Request body to create a registration."""
+
     state: RegistrationState = RegistrationState.created
     event_id: str
     number: Optional[int] = None
@@ -43,47 +45,14 @@ class CreateRegistrationRequest:
 
 @frozen(kw_only=True)
 class UpdateRegistrationRequest:
+    """Request body to update a registration."""
+
     number: Optional[int] = None
     option_ids: set[str] = field(default=Factory(lambda: set()))
     email: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     preferred_name: Optional[str] = None
-
-
-def get_etag(reg: Union[Registration, RegistrationEntity]) -> bytes:
-    """Get the ETag for a registration's version."""
-    return f'W/"{reg.version}"'.encode()
-
-
-def check_etag(request: Request, reg: Union[Registration, RegistrationEntity]):
-    """Check that the ETag matches, or raise :class:`HTTPException`."""
-    header = request.headers.get_first(b"ETag")
-    if not header:
-        raise HTTPException(428)  # precondition required
-
-    expected = get_etag(reg)
-    if header != expected:
-        raise HTTPException(412)  # precondition failed
-
-
-def registration_response(reg: Registration) -> Response:
-    """Return a JSON-encode :class:`Registration`.
-
-    Sets the ``ETag`` header.
-    """
-    data = get_converter().dumps(reg)
-    etag = get_etag(reg)
-    return Response(
-        200,
-        headers=[
-            (b"ETag", etag),
-        ],
-        content=Content(
-            b"application/json",
-            data,
-        ),
-    )
 
 
 @app.router.get("/registrations")
@@ -97,9 +66,8 @@ async def list_registrations(
     reg: RegistrationService,
     page: int,
     per_page: int,
-):
+) -> list[RegistrationListResponse]:
     """Search registrations."""
-
     results = await reg.list_registrations(page=page, per_page=per_page)
     return [r.get_model() for r in results]
 
@@ -119,7 +87,7 @@ async def create_registration(
     body: AttrsBody[CreateRegistrationRequest],
     service: RegistrationService,
     event_config: EventConfig,
-):
+) -> Response:
     """Create a registration."""
     # TODO: permissions
     event = event_config.get_event(body.value.event_id)
@@ -161,7 +129,7 @@ async def create_registration(
 async def read_registration(
     id: UUID,
     service: RegistrationService,
-):
+) -> Response:
     """Read a registration."""
     reg = check_not_found(await service.get_registration(id))
 
@@ -194,7 +162,7 @@ async def update_registration(
     id: UUID,
     service: RegistrationService,
     _body: AttrsBody[CreateRegistrationRequest],
-):
+) -> Response:
     """Update a registration."""
     # TODO: permissions
     reg = check_not_found(await service.get_registration(id, lock=True))
@@ -227,7 +195,7 @@ async def update_registration(
 async def complete_registration(
     id: UUID,
     service: RegistrationService,
-):
+) -> Response:
     """Complete a pending registration."""
     reg = check_not_found(await service.get_registration(id, lock=True))
 
@@ -255,7 +223,7 @@ async def complete_registration(
 async def cancel_registration(
     id: UUID,
     service: RegistrationService,
-):
+) -> Response:
     """Cancel a pending registration."""
     reg = check_not_found(await service.get_registration(id, lock=True))
 
@@ -270,3 +238,38 @@ async def cancel_registration(
 
 
 # TODO: determine delete semantics
+
+
+def check_etag(request: Request, reg: Union[Registration, RegistrationEntity]):
+    """Check that the ETag matches, or raise :class:`HTTPException`."""
+    header = request.headers.get_first(b"ETag")
+    if not header:
+        raise HTTPException(428)  # precondition required
+
+    expected = get_etag(reg)
+    if header != expected:
+        raise HTTPException(412)  # precondition failed
+
+
+def registration_response(reg: Registration) -> Response:
+    """Return a JSON-encode :class:`Registration`.
+
+    Sets the ``ETag`` header.
+    """
+    data = get_converter().dumps(reg)
+    etag = get_etag(reg)
+    return Response(
+        200,
+        headers=[
+            (b"ETag", etag),
+        ],
+        content=Content(
+            b"application/json",
+            data,
+        ),
+    )
+
+
+def get_etag(reg: Union[Registration, RegistrationEntity]) -> bytes:
+    """Get the ETag for a registration's version."""
+    return f'W/"{reg.version}"'.encode()

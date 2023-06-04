@@ -15,6 +15,7 @@ from oes.registration.models.registration import (
     RegistrationState,
     SelfServiceRegistration,
 )
+from typing_extensions import Self
 
 
 @frozen(kw_only=True)
@@ -64,6 +65,8 @@ class BodyValidationError(Exception):
 
 @frozen
 class EventResponse:
+    """An event."""
+
     id: str
     name: str
     description: Optional[str]
@@ -74,6 +77,8 @@ class EventResponse:
 
 @frozen
 class RegistrationListResponse:
+    """A partial registration."""
+
     id: UUID
     state: RegistrationState
     event_id: str
@@ -89,34 +94,44 @@ class RegistrationListResponse:
 
 @frozen
 class InterviewOption:
+    """An available interview option."""
+
     id: str
     name: str
 
 
 @frozen
 class SelfServiceRegistrationResponse:
+    """A sel- service registration."""
+
     registration: SelfServiceRegistration
     change_options: list[InterviewOption] = []
 
 
 @frozen
 class SelfServiceRegistrationListResponse:
+    """A partial self-service registration."""
+
     registrations: list[SelfServiceRegistrationResponse]
     add_options: list[InterviewOption] = []
 
 
 @frozen
 class ModifierResponse:
+    """A line item modifier."""
+
     name: str
     amount: int
 
     @classmethod
-    def create(cls, modifier: Modifier) -> ModifierResponse:
+    def create(cls, modifier: Modifier) -> Self:
         return cls(modifier.name, modifier.amount)
 
 
 @frozen
 class LineItemResponse:
+    """A line item."""
+
     registration_id: UUID
     name: str
     price: int
@@ -125,7 +140,7 @@ class LineItemResponse:
     description: Optional[str] = None
 
     @classmethod
-    def create(cls, line_item: LineItem) -> LineItemResponse:
+    def create(cls, line_item: LineItem) -> Self:
         return cls(
             registration_id=line_item.registration_id,
             name=line_item.name,
@@ -138,12 +153,14 @@ class LineItemResponse:
 
 @frozen
 class PricingResultResponse:
+    """A cart pricing result."""
+
     line_items: Sequence[LineItemResponse]
     total_price: int
     modifiers: Sequence[ModifierResponse] = ()
 
     @classmethod
-    def create(cls, pricing_result: PricingResult) -> PricingResultResponse:
+    def create(cls, pricing_result: PricingResult) -> Self:
         return cls(
             line_items=tuple(
                 LineItemResponse.create(li) for li in pricing_result.line_items
@@ -157,11 +174,15 @@ class PricingResultResponse:
 
 @frozen
 class CheckoutErrorResponse:
+    """A checkout error including the invalid registration IDs."""
+
     registration_ids: list[UUID]
 
 
 @frozen
 class CreateCheckoutResponse:
+    """A created checkout."""
+
     id: UUID
     service: str
     external_id: str
@@ -170,6 +191,8 @@ class CreateCheckoutResponse:
 
 @frozen
 class AccessCodeListResponse:
+    """A list of partial access codes."""
+
     code: str
     event_id: str
     name: str
@@ -178,6 +201,8 @@ class AccessCodeListResponse:
 
 @frozen
 class AccessCodeResponse:
+    """An access code."""
+
     code: str
     event_id: str
     date_created: datetime
@@ -187,7 +212,7 @@ class AccessCodeResponse:
     data: AccessCodeSettings
 
     @classmethod
-    def create(cls, entity: AccessCodeEntity):
+    def create(cls, entity: AccessCodeEntity) -> Self:
         return cls(
             code=entity.code,
             event_id=entity.event_id,

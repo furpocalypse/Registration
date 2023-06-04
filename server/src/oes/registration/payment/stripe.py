@@ -38,6 +38,8 @@ class StripeConfig:
 
 
 class StripePaymentService(PaymentService):
+    """Stripe integration."""
+
     id = "stripe"
     name = "Stripe"
     config: StripeConfig

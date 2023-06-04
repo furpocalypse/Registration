@@ -32,6 +32,8 @@ converter = make_converter()
 
 
 class CredentialType(str, Enum):
+    """Credential types."""
+
     refresh_token = "refresh_token"
     webauthn = "webauthn"
 
@@ -50,6 +52,8 @@ Scopes = NewType("Scopes", frozenset[str])
 
 
 class TokenBase:
+    """Base class for JWTs."""
+
     iss: Optional[str]
     sub: Optional[str]
     aud: Union[str, Sequence[str], None]
@@ -77,7 +81,6 @@ class TokenBase:
         Raises:
             jwt.InvalidTokenError: If the token is not valid.
         """
-
         res = jwt.decode(
             token,
             key=key,
@@ -231,6 +234,8 @@ class User(Identity):
 
 @frozen
 class WebAuthnRegistrationChallenge(TokenBase):
+    """Signed WebAuthn registration challenge."""
+
     typ: Literal["warc"]
     sub: str
     """The challenge data."""
@@ -252,7 +257,6 @@ class WebAuthnRegistrationChallenge(TokenBase):
     @classmethod
     def create(cls, account_id: UUID, challenge_bytes: bytes, origin: str) -> Self:
         """Create a :class:`WebAuthnRegistrationChallenge`."""
-
         return cls(
             typ="warc",
             sub=base64.urlsafe_b64encode(challenge_bytes).decode(),
@@ -264,6 +268,8 @@ class WebAuthnRegistrationChallenge(TokenBase):
 
 @frozen
 class WebAuthnAuthenticationChallenge(TokenBase):
+    """Signed WebAuthn authentication challenge."""
+
     typ: Literal["waac"]
     sub: str
     """The challenge data."""
@@ -285,7 +291,6 @@ class WebAuthnAuthenticationChallenge(TokenBase):
     @classmethod
     def create(cls, account_id: UUID, challenge_bytes: bytes, origin: str) -> Self:
         """Create a :class:`WebAuthnRegistrationChallenge`."""
-
         return cls(
             typ="waac",
             sub=base64.urlsafe_b64encode(challenge_bytes).decode(),
@@ -298,6 +303,8 @@ class WebAuthnAuthenticationChallenge(TokenBase):
 
 @frozen(kw_only=True)
 class TokenResponse:
+    """A token response object."""
+
     access_token: str
     expires_in: int
     refresh_token: str

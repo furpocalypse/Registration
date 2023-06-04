@@ -62,7 +62,6 @@ class CartRegistration:
         meta: Optional[dict[str, Any]] = None,
     ) -> CartRegistration:
         """Create a :class:`CartRegistration` from a registration."""
-
         return cls(
             id=new.id,
             old_data=_reg_to_data(old),
@@ -121,7 +120,6 @@ class CartData:
             CartError: If the registration or submission is already in the cart, or if
                 the registration belongs to a different event.
         """
-
         if cart_registration.id in [cr.id for cr in self.registrations]:
             raise CartError(
                 f"Registration {cart_registration.id} is already in this cart"
@@ -179,7 +177,6 @@ class CartData:
         Returns:
             A list of the IDs that have a mismatched version.
         """
-
         version_map = {r.id: r.version for r in registrations}
 
         bad_ids = []

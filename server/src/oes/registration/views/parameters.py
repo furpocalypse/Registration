@@ -33,7 +33,7 @@ class AttrsBinder(BodyBinder):
     async def read_data(self, request: Request) -> Any:
         return await request.json(loads=json_loads)
 
-    def parse_value(self, data: dict):
+    def parse_value(self, data: dict) -> Any:
         try:
             return get_converter().structure(data, self.expected_type)
         except BaseValidationError as e:
@@ -42,14 +42,20 @@ class AttrsBinder(BodyBinder):
 
 
 class Page(BoundValue[int]):
+    """Page bound value."""
+
     pass
 
 
 class PerPage(BoundValue[int]):
+    """Per-page bound value."""
+
     pass
 
 
 class PageBinder(QueryBinder):
+    """Binds the ``page`` parameter."""
+
     handle = Page
     name_alias = "page"
 
@@ -65,6 +71,8 @@ class PageBinder(QueryBinder):
 
 
 class PerPageBinder(QueryBinder):
+    """Binds the ``per_page`` parameter."""
+
     handle = PerPage
     name_alias = "per_page"
     max = 50

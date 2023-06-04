@@ -10,6 +10,7 @@ import orjson
 from attrs import frozen
 from oes.registration.entities.base import metadata
 from oes.registration.serialization.json import json_default
+from rodi import GetServiceContext
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -24,6 +25,8 @@ session_context: ContextVar[Optional[AsyncSession]] = ContextVar(
 
 @frozen
 class DBConfig:
+    """Database configuration class."""
+
     engine: AsyncEngine
     session_factory: async_sessionmaker
 
@@ -40,7 +43,6 @@ class DBConfig:
 
     async def create_tables(self):
         """Create all database tables."""
-
         # Import modules that define entities
         import oes.registration.entities.cart  # noqa
         import oes.registration.entities.checkout  # noqa
@@ -60,7 +62,8 @@ def _json_dumps(v):
     return orjson.dumps(v, default=json_default).decode()
 
 
-def db_session_factory(services) -> AsyncSession:
+def db_session_factory(services: GetServiceContext) -> AsyncSession:
+    """Service to provide a :class:`AsyncSession` per request."""
     session = session_context.get()
 
     if not session:
@@ -81,14 +84,6 @@ async def db_session_middleware(request, handler):
             await session.close()
 
 
-async def _commit_or_rollback(session: Optional[AsyncSession], success: bool):
-    if session:
-        if success:
-            await session.commit()
-        else:
-            await session.rollback()
-
-
 def transaction(fn):
     """Transaction decorator."""
 
@@ -105,3 +100,11 @@ def transaction(fn):
             await _commit_or_rollback(session, success)
 
     return wrapper
+
+
+async def _commit_or_rollback(session: Optional[AsyncSession], success: bool):
+    if session:
+        if success:
+            await session.commit()
+        else:
+            await session.rollback()

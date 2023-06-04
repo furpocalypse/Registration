@@ -98,7 +98,10 @@ class HookService:
         return res
 
     async def invoke_hook(self, entity: HookLogEntity):
-        """Attempt to invoke a hook. Updates retry count/time if it fails."""
+        """Attempt to invoke a hook.
+
+        Updates retry count/time if it fails.
+        """
         hook = entity.get_hook()
         options = InvokeOptions(hook, self.get_config())
 

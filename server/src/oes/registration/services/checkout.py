@@ -163,7 +163,6 @@ class CheckoutService:
         Returns:
             The :class:`PaymentServiceCheckout`, or None if not found.
         """
-
         if isinstance(checkout, CheckoutEntity):
             service_id = checkout.service
             external_id = checkout.external_id

@@ -39,7 +39,6 @@ class CartService:
 
     async def price_cart(self, cart_data: CartData, event: Event) -> PricingResult:
         """Price a :class:`CartData`."""
-
         # TODO: this might make more sense to be in its own service?
 
         # TODO: include hooks

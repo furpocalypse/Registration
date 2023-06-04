@@ -104,7 +104,7 @@ class EventInterviewOption(Whenable):
     """An available event interview."""
 
     id: str
-    """The interview ID"""
+    """The interview ID."""
 
     name: str
     """The interview name."""
@@ -157,6 +157,8 @@ class Event:
 
 @frozen
 class EventConfig:
+    """Event configuration."""
+
     events: Sequence[Event]
 
     _events_by_id: dict[str, Event] = field(

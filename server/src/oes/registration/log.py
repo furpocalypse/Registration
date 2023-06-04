@@ -8,6 +8,8 @@ from loguru import logger
 
 
 class InterceptHandler(logging.Handler):
+    """Logging handler to redirect standard logging into loguru."""
+
     def emit(self, record):
         # Get corresponding Loguru level if it exists.
         try:
@@ -27,6 +29,8 @@ class InterceptHandler(logging.Handler):
 
 
 class AuditLogType(str, Enum):
+    """Types of audit log entries."""
+
     audit = "audit"
     registration_create = "registration.create"
     registration_create_pending = "registration.create_pending"
@@ -38,7 +42,6 @@ class AuditLogType(str, Enum):
 
 def setup_logging(debug: bool = False):
     """Set up the logger."""
-
     # TODO: configuration
 
     level = logging.DEBUG if debug else logging.INFO

@@ -1,3 +1,4 @@
+"""Access code service."""
 from collections.abc import Sequence
 from datetime import datetime
 from typing import Optional
@@ -31,7 +32,7 @@ class AccessCodeService:
         name: Optional[str],
         expiration_date: datetime,
         settings: AccessCodeSettings,
-    ):
+    ) -> AccessCodeEntity:
         """Create an access code."""
         entity = AccessCodeEntity(
             code=generate_code(),

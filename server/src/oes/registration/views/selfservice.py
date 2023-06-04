@@ -31,7 +31,8 @@ async def list_self_service_registration(
     # TODO: account ID
     service: RegistrationService,
     event_config: EventConfig,
-):
+) -> SelfServiceRegistrationListResponse:
+    """List self-service registrations."""
     if event_id.value:
         event = check_not_found(event_config.get_event(event_id.value))
         add_options = get_allowed_add_interviews(event)

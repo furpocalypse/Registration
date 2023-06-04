@@ -11,7 +11,7 @@ from sqlalchemy import String
 from sqlalchemy.orm import Mapped, mapped_column
 
 ACCESS_CODE_MAX_LEN = 36
-"""Max length of an access code"""
+"""Max length of an access code."""
 
 
 class AccessCodeEntity(Base):

@@ -144,7 +144,6 @@ class RegistrationEntity(Base):
 
     def get_model(self) -> Registration:
         """Get a :class:`Registration` model from this entity."""
-
         return Registration(
             id=self.id,
             state=self.state,
@@ -197,7 +196,6 @@ class RegistrationEntity(Base):
         Returns:
             Whether a change was made.
         """
-
         if self.state != RegistrationState.canceled:
             self.state = RegistrationState.canceled
             self.mark_updated()

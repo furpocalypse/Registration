@@ -4,7 +4,7 @@ from ipaddress import IPv4Network, IPv6Network
 from pathlib import Path
 
 import uvicorn
-from blacksheep import Application, Content, HTTPException, Response
+from blacksheep import Application, Content, HTTPException, Request, Response
 from blacksheep.plugins import json
 from blacksheep.server.remotes.forwarding import XForwardedHeadersMiddleware
 from guardpost import Policy
@@ -51,7 +51,12 @@ app.services.add_scoped(InterviewService)
 app.services.add_scoped(AccessCodeService)
 
 
-async def validation_error_handler(app, request, exc: BodyValidationError):
+# TODO: put all these in a dedicated configuration function.
+
+
+async def _validation_error_handler(
+    app: Application, request: Request, exc: BodyValidationError
+):
     return Response(
         422,
         content=Content(
@@ -61,7 +66,9 @@ async def validation_error_handler(app, request, exc: BodyValidationError):
     )
 
 
-async def conflict_error_handler(app, request, exc: HTTPException):
+async def _conflict_error_handler(
+    app: Application, request: Request, exc: HTTPException
+):
     if len(exc.args) == 1 and isinstance(exc.args[0], str):
         return Response(
             exc.status,
@@ -76,8 +83,8 @@ async def conflict_error_handler(app, request, exc: HTTPException):
         )
 
 
-app.exceptions_handlers[BodyValidationError] = validation_error_handler
-app.exceptions_handlers[409] = conflict_error_handler
+app.exceptions_handlers[BodyValidationError] = _validation_error_handler
+app.exceptions_handlers[409] = _conflict_error_handler
 app.middlewares.append(db_session_middleware)
 
 authorization = app.use_authorization()
@@ -86,7 +93,7 @@ authorization.default_policy = Policy("authenticated", AuthenticatedRequirement(
 
 #
 @app.on_middlewares_configuration
-def configure_forwarded_headers(app: Application):
+def _configure_forwarded_headers(app: Application):
     app.middlewares.insert(
         0,
         XForwardedHeadersMiddleware(
@@ -104,7 +111,7 @@ def configure_forwarded_headers(app: Application):
 
 
 @app.on_start
-async def setup_app(app: Application):
+async def _setup_app(app: Application):
     # TODO: specify paths
     config = load_config(Path("config.yml"))
     events = load_event_config(Path("events.yml"))
@@ -128,7 +135,7 @@ async def setup_app(app: Application):
 
 
 @app.on_stop
-async def shutdown_app(app: Application):
+async def _shutdown_app(app: Application):
     await app.service_provider[HookRetryService].close()
     await shutdown_http_client()
 
@@ -136,9 +143,60 @@ async def shutdown_app(app: Application):
     await db_config.close()
 
 
+def app_factory():
+    """Set up and return the ASGI app."""
+    # There's no way to pass settings from the main uvicorn process to the worker
+    # processes, but we can just parse the command line arguments again
+    args = parse_args()
+
+    # TODO: pass the config to the app so we don't have to parse it twice
+    config = load_config(Path("config.yml"))
+
+    # set up logging
+    setup_logging(debug=args.debug)
+
+    # setup authentication
+    app.use_authentication().add(TokenAuthHandler(config))
+
+    # set up CORS
+
+    app.use_cors(
+        allow_methods=("GET", "POST", "PUT", "DELETE"),
+        allow_origins=config.auth.allowed_origins,
+        allow_headers=(
+            "Authorization",
+            "Content-Type",
+        ),
+    )
+
+    return app
+
+
+def run():
+    """Entry point for the console script."""
+    args = parse_args()
+
+    if args.reload:
+        # for reload to work we have to run in single-worker mode
+        uvicorn.run(
+            "oes.registration.app:app_factory",
+            factory=True,
+            host=args.bind,
+            port=args.port,
+            reload=True,
+            workers=1,
+        )
+    else:
+        uvicorn.run(
+            "oes.registration.app:app_factory",
+            factory=True,
+            host=args.bind,
+            port=args.port,
+        )
+
+
 def parse_args():
     """Parse command line arguments."""
-
     # maybe look at different parsers in the future
     parser = argparse.ArgumentParser(
         description="OES Registration HTTP API server",
@@ -180,60 +238,6 @@ def parse_args():
     )
 
     return parser.parse_args()
-
-
-def app_factory():
-    """Set up and return the ASGI app."""
-
-    # There's no way to pass settings from the main uvicorn process to the worker
-    # processes, but we can just parse the command line arguments again
-    args = parse_args()
-
-    # TODO: pass the config to the app so we don't have to parse it twice
-    config = load_config(Path("config.yml"))
-
-    # set up logging
-    setup_logging(debug=args.debug)
-
-    # setup authentication
-    app.use_authentication().add(TokenAuthHandler(config))
-
-    # set up CORS
-
-    app.use_cors(
-        allow_methods=("GET", "POST", "PUT", "DELETE"),
-        allow_origins=config.auth.allowed_origins,
-        allow_headers=(
-            "Authorization",
-            "Content-Type",
-        ),
-    )
-
-    return app
-
-
-def run():
-    """Entry point for the console script."""
-
-    args = parse_args()
-
-    if args.reload:
-        # for reload to work we have to run in single-worker mode
-        uvicorn.run(
-            "oes.registration.app:app_factory",
-            factory=True,
-            host=args.bind,
-            port=args.port,
-            reload=True,
-            workers=1,
-        )
-    else:
-        uvicorn.run(
-            "oes.registration.app:app_factory",
-            factory=True,
-            host=args.bind,
-            port=args.port,
-        )
 
 
 # Import views

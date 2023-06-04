@@ -12,7 +12,6 @@ import orjson
 TypeFn = Callable[[Any], bool]
 Serializer = Callable[[Any], object]
 
-
 serializers: Mapping[TypeFn, Serializer] = {
     # Sets to lists
     lambda cls: issubclass(cls, (set, frozenset)): lambda v: sorted(v),
@@ -29,13 +28,14 @@ serializers: Mapping[TypeFn, Serializer] = {
 """Mapping of JSON serialization handlers."""
 
 
-@cache
-def _get_serializer(type_: Any) -> Serializer:
-    for type_fn, serializer in serializers.items():
-        if type_fn(type_):
-            return serializer
+def json_dumps(obj: object) -> bytes:
+    """JSON dumps function."""
+    return orjson.dumps(obj, default=json_default)
 
-    raise TypeError(f"Cannot JSON serialize type: {type_}")
+
+def json_loads(v: Union[str, bytes]) -> Any:
+    """JSON loads function."""
+    return orjson.loads(v)
 
 
 def json_default(v: object) -> object:
@@ -45,11 +45,10 @@ def json_default(v: object) -> object:
     return serializer(v)
 
 
-def json_dumps(obj: object) -> bytes:
-    """JSON dumps function."""
-    return orjson.dumps(obj, default=json_default)
+@cache
+def _get_serializer(type_: Any) -> Serializer:
+    for type_fn, serializer in serializers.items():
+        if type_fn(type_):
+            return serializer
 
-
-def json_loads(v: Union[str, bytes]) -> Any:
-    """JSON loads function."""
-    return orjson.loads(v)
+    raise TypeError(f"Cannot JSON serialize type: {type_}")

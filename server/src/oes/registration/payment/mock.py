@@ -1,3 +1,4 @@
+"""Mock payment service."""
 import uuid
 from typing import Any, Iterable, Optional
 
@@ -17,6 +18,8 @@ from oes.registration.util import get_now
 
 
 class MockPaymentService(PaymentService):
+    """Mock payment service."""
+
     id = "mock"
     name = "Mock"
 

@@ -1,3 +1,4 @@
+"""Payment configuration objects."""
 from __future__ import annotations
 
 from collections.abc import Iterable
@@ -61,7 +62,6 @@ class PaymentServices:
         Returns:
             The service, or None if not available.
         """
-
         return self.services.get(id)
 
 

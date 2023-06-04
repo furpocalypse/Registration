@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class RegistrationService:
+    """Registration service."""
+
     def __init__(self, db: AsyncSession):
         self.db = db
 
@@ -50,7 +52,6 @@ class RegistrationService:
             ids: The IDs.
             lock: Whether to lock the rows.
         """
-
         q = (
             select(RegistrationEntity)
             .where(RegistrationEntity.id.in_(list(ids)))

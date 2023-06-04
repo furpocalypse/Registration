@@ -11,7 +11,6 @@ import pydantic
 import webauthn
 from blacksheep import URL, Request
 from blacksheep.exceptions import Unauthorized
-from blacksheep.server.bindings import Binder, BoundValue
 from jwt import InvalidTokenError
 from loguru import logger
 from oes.registration.entities.auth import AccountEntity, CredentialEntity
@@ -78,21 +77,9 @@ def get_access_token_from_request(request: Request) -> Optional[AccessToken]:
 T = TypeVar("T", bound=Optional[AccessToken])
 
 
-class FromAuth(BoundValue[T]):
-    pass
-
-
-class AccessTokenBinder(Binder):
-    handle = FromAuth
-
-    async def get_value(self, request: Request) -> Optional[AccessToken]:
-        access_token = get_access_token_from_request(request)
-        if not access_token and self.required:
-            raise Unauthorized
-        return access_token
-
-
 class AuthService:
+    """Auth service."""
+
     def __init__(
         self,
         db: AsyncSession,
@@ -158,7 +145,6 @@ class AuthService:
             account: The account.
             token: The :class:`RefreshToken`.
         """
-
         credential_id, token_num = token.token_info
 
         as_dict = token_converter.unstructure(token)
@@ -241,7 +227,8 @@ async def get_refresh_token_by_str(
     Returns:
         A tuple of the decoded :class:`RefreshToken`, the current
         :class:`RefreshToken` in the database, and the :class:`CredentialEntity` if
-        found/valid, else None."""
+        found/valid, else None.
+    """
     try:
         provided_token = RefreshToken.decode(token_str, key=config.auth.signing_key)
     except InvalidTokenError:
@@ -301,43 +288,6 @@ async def create_new_account(
     return token_response
 
 
-async def create_new_refresh_token(
-    service: AuthService,
-    config: Config,
-    account: AccountEntity,
-    scopes: Iterable[str],
-    expiration_date: Optional[datetime] = None,
-    credential_id: Optional[str] = None,
-) -> tuple[str, RefreshToken]:
-    """Create a new refresh token.
-
-    Adds the new credential to the ``account``.
-
-    Args:
-        service: The :class:`AuthService`.
-        config: The server configuration.
-        account: The account entity.
-        scopes: Scopes for the token.
-        expiration_date: A non-default expiration date.
-
-    Returns:
-        A pair of the signed token string, and the :class:`RefreshToken` object.
-    """
-    credential_id = credential_id or secrets.token_hex(16)
-
-    token = RefreshToken.create(
-        account_id=account.id,
-        credential_id=credential_id,
-        token_num=1,
-        scopes=scopes,
-        expiration_date=expiration_date,
-    )
-    signed = token.encode(key=config.auth.signing_key)
-
-    await service.create_refresh_token(account, token)
-    return signed, token
-
-
 def update_refresh_token(
     config: Config,
     credential: CredentialEntity,
@@ -355,7 +305,6 @@ def update_refresh_token(
     Returns:
         A pair of the signed token string, and the new :class:`RefreshToken`.
     """
-
     token = token_converter.structure(credential.data, RefreshToken)
     _, token_num = token.token_info
 
@@ -377,30 +326,6 @@ def update_refresh_token(
     return signed, updated
 
 
-def _create_access_token_from_refresh_token(
-    config: Config,
-    account: AccountEntity,
-    refresh_token: RefreshToken,
-) -> tuple[str, AccessToken]:
-    """Create an access token from a refresh token."""
-    access_token = AccessToken.create(
-        account_id=account.id,
-        email=account.email,
-        scopes=refresh_token.scope,
-    )
-    signed_access_token = access_token.encode(key=config.auth.signing_key)
-    return signed_access_token, access_token
-
-
-def _origin_to_rp_id(origin: str) -> str:
-    try:
-        url_obj = URL(origin.encode())
-        # only https: schemes are supported
-        return url_obj.host.decode()
-    except Exception:
-        return ""
-
-
 def get_webauthn_registration_challenge(
     config: Config,
     account_id: UUID,
@@ -413,7 +338,6 @@ def get_webauthn_registration_challenge(
         The signed :class:`WebAuthnRegistrationChallenge` as a string, and the options
         as a dict.
     """
-
     if origin not in config.auth.allowed_auth_origins:
         logger.debug(f"Origin not allowed: {origin}")
         raise AuthorizationError
@@ -491,41 +415,6 @@ def verify_webauthn_registration_response(
         raise AuthorizationError
 
 
-def _check_challenge_reuse(
-    account: AccountEntity,
-    challenge: str,
-):
-    """Check that a challenge was not re-used for account registration."""
-    for cred in account.credentials:
-        if cred.type == CredentialType.webauthn and cred.data["challenge"] == challenge:
-            logger.debug(f"Webauthn registration challenge reused: {challenge}")
-            raise AuthorizationError
-
-
-def _check_auth_challenge_reuse(
-    account: AccountEntity,
-    challenge: str,
-):
-    """Check that an authentication challenge was not re-used."""
-    challenge_hex = unpadded_urlsafe_b64decode(challenge).hex()
-    for cred in account.credentials:
-        if cred.id == challenge_hex:
-            logger.debug(f"Webauthn authentication challenge reused: {challenge}")
-            raise AuthorizationError
-
-
-def _get_credential(
-    account: AccountEntity,
-    id: str,
-) -> CredentialEntity:
-    for cred in account.credentials:
-        if cred.id == id:
-            return cred
-    else:
-        logger.debug(f"Credential ID not found: {id}")
-        raise AuthorizationError
-
-
 async def create_webauthn_registration(
     service: AuthService,
     config: Config,
@@ -591,9 +480,7 @@ async def get_webauthn_authentication_challenge(
         config: The server config.
         credential_id: The credential ID as a base64-encoded string.
         origin: The origin.
-
     """
-
     if origin not in config.auth.allowed_auth_origins:
         logger.debug(f"Origin not allowed: {origin}")
         raise AuthorizationError
@@ -728,3 +615,99 @@ async def verify_webauthn_authentication_response(
         refresh_token=signed_refresh_token,
         scope=join_scope(access_token.scope),
     )
+
+
+async def create_new_refresh_token(
+    service: AuthService,
+    config: Config,
+    account: AccountEntity,
+    scopes: Iterable[str],
+    expiration_date: Optional[datetime] = None,
+    credential_id: Optional[str] = None,
+) -> tuple[str, RefreshToken]:
+    """Create a new refresh token.
+
+    Adds the new credential to the ``account``.
+
+    Args:
+        service: The :class:`AuthService`.
+        config: The server configuration.
+        account: The account entity.
+        scopes: Scopes for the token.
+        expiration_date: A non-default expiration date.
+
+    Returns:
+        A pair of the signed token string, and the :class:`RefreshToken` object.
+    """
+    credential_id = credential_id or secrets.token_hex(16)
+
+    token = RefreshToken.create(
+        account_id=account.id,
+        credential_id=credential_id,
+        token_num=1,
+        scopes=scopes,
+        expiration_date=expiration_date,
+    )
+    signed = token.encode(key=config.auth.signing_key)
+
+    await service.create_refresh_token(account, token)
+    return signed, token
+
+
+def _create_access_token_from_refresh_token(
+    config: Config,
+    account: AccountEntity,
+    refresh_token: RefreshToken,
+) -> tuple[str, AccessToken]:
+    """Create an access token from a refresh token."""
+    access_token = AccessToken.create(
+        account_id=account.id,
+        email=account.email,
+        scopes=refresh_token.scope,
+    )
+    signed_access_token = access_token.encode(key=config.auth.signing_key)
+    return signed_access_token, access_token
+
+
+def _origin_to_rp_id(origin: str) -> str:
+    try:
+        url_obj = URL(origin.encode())
+        # only https: schemes are supported
+        return url_obj.host.decode()
+    except Exception:
+        return ""
+
+
+def _check_challenge_reuse(
+    account: AccountEntity,
+    challenge: str,
+):
+    """Check that a challenge was not re-used for account registration."""
+    for cred in account.credentials:
+        if cred.type == CredentialType.webauthn and cred.data["challenge"] == challenge:
+            logger.debug(f"Webauthn registration challenge reused: {challenge}")
+            raise AuthorizationError
+
+
+def _check_auth_challenge_reuse(
+    account: AccountEntity,
+    challenge: str,
+):
+    """Check that an authentication challenge was not re-used."""
+    challenge_hex = unpadded_urlsafe_b64decode(challenge).hex()
+    for cred in account.credentials:
+        if cred.id == challenge_hex:
+            logger.debug(f"Webauthn authentication challenge reused: {challenge}")
+            raise AuthorizationError
+
+
+def _get_credential(
+    account: AccountEntity,
+    id: str,
+) -> CredentialEntity:
+    for cred in account.credentials:
+        if cred.id == id:
+            return cred
+    else:
+        logger.debug(f"Credential ID not found: {id}")
+        raise AuthorizationError

@@ -7,6 +7,15 @@ allow-untyped-defs = true
 allow-untyped-nested = true
 mypy-init-return = true
 
-extend-ignore = ANN101,NN102,ANN202
+extend-ignore =
+    # ignore annotations on cls, self, and "protected" functions
+    ANN101,
+    ANN102,
+    ANN202,
+
+    # ignore required docstring on methods, magic methods, and __init__
+    D102,
+    D105,
+    D107,
 
 per-file-ignores = **/tests/**: D,ANN,NEW

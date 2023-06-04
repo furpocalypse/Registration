@@ -36,27 +36,6 @@ from oes.registration.views.responses import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
-async def _validate_changes_apply(
-    cart_data: CartData, registration_service: RegistrationService, lock: bool
-):
-    invalid = await validate_changes_apply(registration_service, cart_data, lock=lock)
-
-    if len(invalid) > 0:
-        return Response(
-            409,
-            content=Content(
-                b"application/json",
-                get_converter().dumps(
-                    CheckoutErrorResponse(
-                        registration_ids=[r.id for r in invalid],
-                    )
-                ),
-            ),
-        )
-    else:
-        return None
-
-
 @app.router.get("/carts/{cart_id}/checkout-methods")
 @docs_helper(
     response_type=list[CheckoutMethod],
@@ -68,7 +47,8 @@ async def list_available_checkout_methods(
     cart_service: CartService,
     checkout_service: CheckoutService,
     event_config: EventConfig,
-):
+) -> list[CheckoutMethod]:
+    """List checkout methods."""
     cart_entity = check_not_found(await cart_service.get_cart(cart_id))
     cart_data = cart_entity.get_cart_data_model()
 
@@ -96,19 +76,6 @@ async def list_available_checkout_methods(
     return methods
 
 
-async def _validate_checkout_method(
-    service: str,
-    method: str,
-    cart_data: CartData,
-    pricing_result: PricingResult,
-    checkout_service: CheckoutService,
-):
-    options = await checkout_service.get_checkout_methods_for_cart(
-        cart_data, pricing_result
-    )
-    return any(o.service == service and o.method == method for o in options)
-
-
 @app.router.post("/carts/{cart_id}/checkout")
 @docs(
     responses={
@@ -133,7 +100,7 @@ async def create_checkout(
     event_config: EventConfig,
     db: AsyncSession,
     _body: Optional[FromBytes],
-):
+) -> Response:
     """Create a checkout for a cart."""
     cart_entity = check_not_found(await cart_service.get_cart(cart_id))
     cart = cart_entity.get_cart_data_model()
@@ -195,7 +162,7 @@ async def create_checkout(
     tags=["Checkout"],
 )
 @transaction
-async def cancel_checkout(id: UUID, checkout_service: CheckoutService):
+async def cancel_checkout(id: UUID, checkout_service: CheckoutService) -> Response:
     """Cancel a checkout."""
     # TODO: permissions
     result = await checkout_service.cancel_checkout(id)
@@ -205,44 +172,6 @@ async def cancel_checkout(id: UUID, checkout_service: CheckoutService):
         return Response(204)
     else:
         raise HTTPException(409, "Checkout could not be canceled")
-
-
-async def _handle_update(
-    registration_service: RegistrationService,
-    event_service: EventService,
-    checkout_entity: CheckoutEntity,
-    checkout_result: PaymentServiceCheckout,
-):
-    if (
-        checkout_result.state == CheckoutState.complete
-        and not checkout_entity.changes_applied
-    ):
-        updated = await apply_checkout_changes(registration_service, checkout_entity)
-        cart_data = checkout_entity.get_cart_data()
-        event_id = cart_data.event_id
-
-        # Assign registration numbers at the end, so the row storing the number
-        # does not stay locked while updating the transaction
-        event_stats = await event_service.get_event_stats(event_id, lock=True)
-        assign_registration_numbers(event_stats, updated)
-
-    if checkout_result.is_open:
-        return Response(
-            200,
-            content=Content(
-                b"application/json",
-                get_converter().dumps(
-                    CreateCheckoutResponse(
-                        id=checkout_entity.id,
-                        service=checkout_entity.service,
-                        external_id=checkout_result.id,
-                        data=checkout_result.response_data,
-                    )
-                ),
-            ),
-        )
-    else:
-        return Response(204)
 
 
 @app.router.post("/checkouts/{id}/update")
@@ -262,7 +191,7 @@ async def update_checkout(
     registration_service: RegistrationService,
     event_service: EventService,
     db: AsyncSession,
-):
+) -> Response:
     """Update a checkout."""
     checkout = check_not_found(await checkout_service.get_checkout(id, lock=True))
 
@@ -306,3 +235,75 @@ async def update_checkout(
             f"after updating the checkout. This may need to be resolved manually."
         )
         raise
+
+
+async def _handle_update(
+    registration_service: RegistrationService,
+    event_service: EventService,
+    checkout_entity: CheckoutEntity,
+    checkout_result: PaymentServiceCheckout,
+):
+    if (
+        checkout_result.state == CheckoutState.complete
+        and not checkout_entity.changes_applied
+    ):
+        updated = await apply_checkout_changes(registration_service, checkout_entity)
+        cart_data = checkout_entity.get_cart_data()
+        event_id = cart_data.event_id
+
+        # Assign registration numbers at the end, so the row storing the number
+        # does not stay locked while updating the transaction
+        event_stats = await event_service.get_event_stats(event_id, lock=True)
+        assign_registration_numbers(event_stats, updated)
+
+    if checkout_result.is_open:
+        return Response(
+            200,
+            content=Content(
+                b"application/json",
+                get_converter().dumps(
+                    CreateCheckoutResponse(
+                        id=checkout_entity.id,
+                        service=checkout_entity.service,
+                        external_id=checkout_result.id,
+                        data=checkout_result.response_data,
+                    )
+                ),
+            ),
+        )
+    else:
+        return Response(204)
+
+
+async def _validate_changes_apply(
+    cart_data: CartData, registration_service: RegistrationService, lock: bool
+):
+    invalid = await validate_changes_apply(registration_service, cart_data, lock=lock)
+
+    if len(invalid) > 0:
+        return Response(
+            409,
+            content=Content(
+                b"application/json",
+                get_converter().dumps(
+                    CheckoutErrorResponse(
+                        registration_ids=[r.id for r in invalid],
+                    )
+                ),
+            ),
+        )
+    else:
+        return None
+
+
+async def _validate_checkout_method(
+    service: str,
+    method: str,
+    cart_data: CartData,
+    pricing_result: PricingResult,
+    checkout_service: CheckoutService,
+):
+    options = await checkout_service.get_checkout_methods_for_cart(
+        cart_data, pricing_result
+    )
+    return any(o.service == service and o.method == method for o in options)

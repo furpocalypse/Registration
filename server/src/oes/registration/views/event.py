@@ -1,7 +1,9 @@
 """Event views."""
+from collections.abc import Sequence
+
 from oes.registration.app import app
 from oes.registration.docs import docs_helper
-from oes.registration.models.event import EventConfig
+from oes.registration.models.event import Event, EventConfig
 from oes.registration.util import check_not_found
 from oes.registration.views.responses import EventResponse
 
@@ -12,7 +14,7 @@ from oes.registration.views.responses import EventResponse
     response_summary="The list of available events",
     tags=["Event"],
 )
-async def list_events(events: EventConfig):
+async def list_events(events: EventConfig) -> Sequence[Event]:
     """List the available events."""
     return events.events
 
@@ -22,7 +24,7 @@ async def list_events(events: EventConfig):
 async def read_event(
     event_id: str,
     event_config: EventConfig,
-):
+) -> Event:
     """Get an event by ID."""
     event = check_not_found(event_config.get_event(event_id))
     return event

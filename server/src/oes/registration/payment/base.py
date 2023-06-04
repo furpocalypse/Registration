@@ -84,7 +84,7 @@ class CheckoutMethodsRequest:
     """Request to get checkout options."""
 
     service: str
-    """the service ID."""
+    """The service ID."""
 
     cart_data: CartData
     """The cart data."""
@@ -132,13 +132,15 @@ class UpdateRequest:
 WebhookParser = Callable[[WebhookRequestInfo], object]
 """Callable to parse a webhook request and return the parsed body.
 
-Must raise :class:`ValidationError` if the parsing fails.
+Must raise
+:class: `ValidationError` if the parsing fails.
 """
 
 WebhookValidator = Callable[[WebhookRequestInfo, object], object]
 """Callable to validate a webhook request and return the validated body.
 
-Must raise :class:`ValidationError` if the validation fails.
+Must raise
+:class: `ValidationError` if the validation fails.
 """
 
 UpdateHandler = Callable[[UpdateRequest], Awaitable[PaymentServiceCheckout]]
@@ -162,6 +164,8 @@ class PaymentService(ABC):
     def name(self) -> str:
         """The human-readable service name."""
         ...
+
+    # TODO: these should be implemented via Protocol instead of like this...
 
     @property
     def webhook_parser(self) -> Optional[WebhookParser]:
@@ -197,7 +201,7 @@ class PaymentService(ABC):
     async def get_checkout_methods(
         self, request: CheckoutMethodsRequest
     ) -> Iterable[CheckoutMethod]:
-        """Get the available checkout methods
+        """Get the available checkout methods.
 
         Args:
             request:

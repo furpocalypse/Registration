@@ -1,8 +1,7 @@
 """Auth handlers."""
-from typing import Any, Callable, Optional
+from typing import Optional
 
 from blacksheep import Request
-from blacksheep.server.bindings import Binder, BoundValue
 from guardpost import Identity
 from guardpost.asynchronous.authentication import AuthenticationHandler
 from jwt import InvalidTokenError
@@ -41,27 +40,3 @@ class TokenAuthHandler(AuthenticationHandler):
         else:
             context.identity = None
             return None
-
-
-class RequestUser(BoundValue[User]):
-    """Bound value for the app specific :class:`User` class."""
-
-    pass
-
-
-class UserBinder(Binder):
-    handle = RequestUser
-    type_alias = User
-
-    def __init__(
-        self,
-        expected_type: Any = User,
-        name: str = "",
-        implicit: bool = True,
-        required: bool = True,
-        converter: Optional[Callable] = None,
-    ):
-        super().__init__(expected_type, name, implicit, required, converter)
-
-    async def get_value(self, request: Request) -> Optional[User]:
-        return getattr(request, "identity", None)

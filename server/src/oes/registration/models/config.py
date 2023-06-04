@@ -7,12 +7,16 @@ from attrs import field, frozen, validators
 
 @frozen
 class DatabaseConfig:
+    """Database configuration."""
+
     url: str = field(repr=False)
     """The database URL."""
 
 
 @frozen
 class AuthConfig:
+    """Authentication/authorization configuration."""
+
     signing_key: str = field(repr=False)
     """The token signing key."""
 
@@ -31,6 +35,8 @@ PaymentServiceConfig = dict[str, Any]
 
 @frozen
 class PaymentConfig:
+    """Payment configuration."""
+
     currency: str = "USD"
     """The currency code."""
 
@@ -44,7 +50,7 @@ Base64Bytes = NewType("Base64Bytes", bytes)
 
 @frozen
 class InterviewConfig:
-    """Interview config."""
+    """Interview configuration."""
 
     encryption_key: Base64Bytes = field(
         repr=False, validator=[validators.min_len(32), validators.max_len(32)]

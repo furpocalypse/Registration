@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class EventService:
+    """Event service."""
+
     def __init__(self, db: AsyncSession):
         self.db = db
 

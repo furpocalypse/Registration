@@ -28,33 +28,8 @@ converter = CustomConverter()
 configure_common(converter)
 
 
-# Sequence[T] is structured as tuple[T, ...]
-def structure_sequence(c, v, t):
-    args = get_args(t)
-    return c.structure(v, Tuple[args[0], ...])
-
-
-def structure_base64_bytes(v, t):
-    if isinstance(v, (bytes, bytearray)):
-        return bytes(v)
-    elif not isinstance(v, str):
-        raise TypeError(f"Invalid base64 data: {v!r}")
-
-    decoded = base64.b64decode(v)
-    return Base64Bytes(decoded)
-
-
-def unstructure_base64_bytes(v):
-    if isinstance(v, str):
-        return v
-    elif not isinstance(v, (bytes, bytearray)):
-        raise TypeError(f"Invalid bytes: {v!r}")
-
-    encoded = base64.b64encode(v)
-    return encoded.decode()
-
-
 def configure_converter(c: Converter):
+    """Configure a converter to work with configuration related types."""
     c.register_structure_hook(Base64Bytes, structure_base64_bytes)
     c.register_structure_hook_func(
         lambda cls: get_origin(cls) is Sequence,
@@ -75,6 +50,35 @@ def configure_converter(c: Converter):
     c.register_unstructure_hook(Expression, unstructure_expression)
     c.register_unstructure_hook(LogicAnd, lambda v: unstructure_and(c, v))
     c.register_unstructure_hook(LogicOr, lambda v: unstructure_or(c, v))
+
+
+# Sequence[T] is structured as tuple[T, ...]
+def structure_sequence(c, v, t):
+    """Structure :class:`Sequence` into a tuple."""
+    args = get_args(t)
+    return c.structure(v, Tuple[args[0], ...])
+
+
+def structure_base64_bytes(v, t):
+    """Structure a base64 string into bytes."""
+    if isinstance(v, (bytes, bytearray)):
+        return bytes(v)
+    elif not isinstance(v, str):
+        raise TypeError(f"Invalid base64 data: {v!r}")
+
+    decoded = base64.b64decode(v)
+    return Base64Bytes(decoded)
+
+
+def unstructure_base64_bytes(v):
+    """Unstructure bytes into a base64 string."""
+    if isinstance(v, str):
+        return v
+    elif not isinstance(v, (bytes, bytearray)):
+        raise TypeError(f"Invalid bytes: {v!r}")
+
+    encoded = base64.b64encode(v)
+    return encoded.decode()
 
 
 configure_converter(converter)

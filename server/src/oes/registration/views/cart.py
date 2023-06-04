@@ -37,26 +37,22 @@ from oes.registration.views.responses import BodyValidationError, PricingResultR
 
 @frozen
 class AddRegistrationDirectRequest:
+    """Request body to add a registration directly to a cart."""
+
     registration: dict[str, Any]
     meta: Optional[dict[str, Any]] = None
 
 
 @frozen
 class AddRegistrationFromInterviewRequest:
+    """Add a registration from a completed interview."""
+
     state: str
 
 
 AddRegistrationRequest = Union[
     AddRegistrationDirectRequest, AddRegistrationFromInterviewRequest
 ]
-
-
-def validate_registration(data: dict[str, Any]) -> Registration:
-    """Validate that a :class:`Registration` is valid."""
-    try:
-        return get_converter().structure(data, Registration)
-    except BaseValidationError as e:
-        raise BodyValidationError(e)
 
 
 @app.router.post("/carts")
@@ -67,7 +63,7 @@ async def create_cart(
     body: AttrsBody[CartData],
     service: CartService,
     event_config: EventConfig,
-):
+) -> Response:
     """Create a cart."""
     # TODO: permissions
     cart_data = body.value
@@ -81,7 +77,7 @@ async def create_cart(
 
     # Check that the new data is valid for each registration
     for cr in cart_data.registrations:
-        validate_registration(cr.new_data)
+        _validate_registration(cr.new_data)
 
     # Create the cart
     entity = CartEntity.create(cart_data)
@@ -111,9 +107,8 @@ async def read_empty_cart(
     request: Request,
     service: CartService,
     event_config: EventConfig,
-):
+) -> Response:
     """Get an empty cart."""
-
     # TODO: permissions
     event = check_not_found(event_config.get_event(event_id.value))
 
@@ -132,7 +127,7 @@ async def read_empty_cart(
     responses={200: ResponseInfo("The cart data", content=[ContentInfo(CartData)])},
     tags=["Cart"],
 )
-async def read_cart(id: str, service: CartService):
+async def read_cart(id: str, service: CartService) -> Response:
     """Read a cart."""
     # TODO: permissions
     cart = check_not_found(await service.get_cart(id))
@@ -163,7 +158,7 @@ async def read_cart_pricing_result(
     id: str,
     service: CartService,
     event_config: EventConfig,
-):
+) -> PricingResultResponse:
     """Get the cart pricing result."""
     cart = check_not_found(await service.get_cart(id))
     model = cart.get_cart_data_model()
@@ -190,20 +185,184 @@ async def read_cart_pricing_result(
     return PricingResultResponse.create(result)
 
 
-def _check_interview_availability(
-    interview_id: str,
-    event: Event,
-    registration: Optional[RegistrationEntity],
-) -> str:
-    """Raise not found if the interview is not permitted."""
-    if registration:
-        allowed = get_allowed_change_interviews(event, registration)
-    else:
-        allowed = get_allowed_add_interviews(event)
+@app.router.post("/carts/{id}/registrations")
+@docs(
+    request_body=RequestBodyInfo(
+        description="The registration info, or interview state",
+        examples={
+            "direct": {
+                "registration": {
+                    "id": "105e8d85-4f06-42b4-98c0-11c3cd0fe3c6",
+                    "event_id": "example-event",
+                    "state": "created",
+                    "date_created": "2020-01-01T12:00:00+00:00",
+                    "version": 1,
+                    "option_ids": ["attendee"],
+                },
+                "meta": {
+                    "is_minor": True,
+                },
+            },
+            "interview": {
+                "state": "ZXhhbXBsZQ==",
+            },
+        },
+    ),
+    responses={303: ResponseInfo("Redirect to the new cart")},
+    tags=["Cart"],
+)
+@transaction
+async def add_registration_to_cart(
+    id: str,
+    request: Request,
+    service: CartService,
+    reg_service: RegistrationService,
+    interview_service: InterviewService,
+    event_config: EventConfig,
+    body: FromJSON[dict[str, Any]],
+) -> Response:
+    """Add a registration to a cart."""
+    add_obj = _parse_add_body(body.value)
 
-    if interview_id not in [o.id for o in allowed]:
+    cart_entity = check_not_found(await service.get_cart(id))
+    cart = cart_entity.get_cart_data_model()
+    event = check_not_found(event_config.get_event(cart.event_id))
+
+    # TODO: permissions
+    # TODO: adding from an interview state
+
+    if isinstance(add_obj, AddRegistrationDirectRequest):
+        new_cart_entity = await _add_direct(cart, add_obj, service, reg_service)
+    else:
+        current_url = build_absolute_url(
+            request.scheme.encode(),
+            request.host.encode(),
+            request.base_path.encode(),
+            request.url.path,
+        ).value.decode()
+
+        new_cart_entity = await _add_from_interview(
+            cart,
+            event,
+            add_obj.state,
+            current_url,
+            service,
+            reg_service,
+            interview_service,
+        )
+
+    cart_url = get_absolute_url_to_path(request, f"/carts/{new_cart_entity.id}")
+
+    return Response(
+        303,
+        headers=[
+            (b"Location", cart_url.value),
+        ],
+    )
+
+
+@app.router.delete("/carts/{id}/registrations/{registration_id}")
+@docs(
+    responses={
+        303: ResponseInfo("Redirect to the new cart"),
+    },
+    tags=["Cart"],
+)
+@transaction
+async def remove_registration_from_cart(
+    id: str,
+    registration_id: UUID,
+    request: Request,
+    service: CartService,
+) -> Response:
+    """Remove a registration from a cart."""
+    # TODO: permissions
+    entity = check_not_found(await service.get_cart(id))
+    cart = entity.get_cart_data_model()
+    updated = cart.remove_registration(registration_id)
+    if updated == cart:
         raise NotFound
-    return interview_id
+
+    new_entity = CartEntity.create(updated)
+    new_entity = await service.save_cart(new_entity)
+
+    cart_url = get_absolute_url_to_path(request, f"/carts/{new_entity.id}")
+
+    return Response(
+        303,
+        headers=[
+            (b"Location", cart_url.value),
+        ],
+    )
+
+
+@app.router.get("/carts/{id}/new-interview")
+@docs(
+    responses={
+        200: ResponseInfo(
+            "An interview state response",
+        )
+    },
+    tags=["Cart"],
+)
+@serialize(IncompleteInterviewStateResponse)
+async def create_cart_add_interview_state(
+    request: Request,
+    id: str,
+    interview_id: FromQuery[str],
+    registration_id: FromQuery[Optional[UUID]],
+    config: Config,
+    event_config: EventConfig,
+    service: CartService,
+    registration_service: RegistrationService,
+    interview_service: InterviewService,
+) -> IncompleteInterviewStateResponse:
+    """Get an interview state to add a registration to a cart."""
+    entity = check_not_found(await service.get_cart(id))
+    cart = entity.get_cart_data_model()
+    # TODO: permissions
+    event = check_not_found(event_config.get_event(cart.event_id))
+    # TODO: event visibility
+
+    if registration_id.value is not None:
+        registration = await _get_registration_for_change(
+            registration_id.value, registration_service
+        )
+    else:
+        registration = None
+
+    valid_interview_id = _check_interview_availability(
+        interview_id.value, event, registration
+    )
+
+    # Build state
+    context = _get_interview_context(event)
+    initial_data = _get_interview_initial_data(event.id, registration)
+    submission_id = uuid.uuid4()
+
+    target_url = get_absolute_url_to_path(request, f"/carts/{entity.id}/registrations")
+
+    state = interview_service.create_state(
+        valid_interview_id,
+        target_url=target_url.value.decode(),
+        submission_id=submission_id,
+        context=context,
+        initial_data=initial_data,
+    )
+
+    return IncompleteInterviewStateResponse(
+        state=state,
+        update_url=config.interview.update_url,
+        content=None,
+    )
+
+
+def _validate_registration(data: dict[str, Any]) -> Registration:
+    """Validate that a :class:`Registration` is valid."""
+    try:
+        return get_converter().structure(data, Registration)
+    except BaseValidationError as e:
+        raise BodyValidationError(e)
 
 
 async def _get_registration_for_change(
@@ -244,35 +403,6 @@ def _get_interview_initial_data(
     return {
         "registration": registration_data,
     }
-
-
-def _parse_registration_data(data: dict[str, Any]) -> Registration:
-    try:
-        registration = get_converter().structure(data, Registration)
-    except BaseValidationError as e:
-        raise BodyValidationError(e)
-    return registration
-
-
-async def _add_to_cart(
-    cart: CartData,
-    old_reg: Optional[RegistrationEntity],
-    new_reg: Registration,
-    submission_id: Optional[str],
-    meta: Optional[dict[str, Any]],
-    service: CartService,
-) -> CartEntity:
-    cr = CartRegistration.create(
-        old_reg, new_reg, submission_id=submission_id, meta=meta
-    )
-
-    try:
-        new_cart = cart.add_registration(cr)
-    except CartError as e:
-        raise HTTPException(409, str(e))
-
-    entity = CartEntity.create(new_cart)
-    return await service.save_cart(entity)
 
 
 async def _add_direct(
@@ -331,174 +461,46 @@ def _parse_add_body(body: dict[str, Any]) -> AddRegistrationRequest:
     return obj
 
 
-@app.router.post("/carts/{id}/registrations")
-@docs(
-    request_body=RequestBodyInfo(
-        description="The registration info, or interview state",
-        examples={
-            "direct": {
-                "registration": {
-                    "id": "105e8d85-4f06-42b4-98c0-11c3cd0fe3c6",
-                    "event_id": "example-event",
-                    "state": "created",
-                    "date_created": "2020-01-01T12:00:00+00:00",
-                    "version": 1,
-                    "option_ids": ["attendee"],
-                },
-                "meta": {
-                    "is_minor": True,
-                },
-            },
-            "interview": {
-                "state": "ZXhhbXBsZQ==",
-            },
-        },
-    ),
-    responses={303: ResponseInfo("Redirect to the new cart")},
-    tags=["Cart"],
-)
-@transaction
-async def add_registration_to_cart(
-    id: str,
-    request: Request,
-    service: CartService,
-    reg_service: RegistrationService,
-    interview_service: InterviewService,
-    event_config: EventConfig,
-    body: FromJSON[dict[str, Any]],
-):
-    """Add a registration to a cart."""
-
-    add_obj = _parse_add_body(body.value)
-
-    cart_entity = check_not_found(await service.get_cart(id))
-    cart = cart_entity.get_cart_data_model()
-    event = check_not_found(event_config.get_event(cart.event_id))
-
-    # TODO: permissions
-    # TODO: adding from an interview state
-
-    if isinstance(add_obj, AddRegistrationDirectRequest):
-        new_cart_entity = await _add_direct(cart, add_obj, service, reg_service)
+def _check_interview_availability(
+    interview_id: str,
+    event: Event,
+    registration: Optional[RegistrationEntity],
+) -> str:
+    """Raise not found if the interview is not permitted."""
+    if registration:
+        allowed = get_allowed_change_interviews(event, registration)
     else:
-        current_url = build_absolute_url(
-            request.scheme.encode(),
-            request.host.encode(),
-            request.base_path.encode(),
-            request.url.path,
-        ).value.decode()
+        allowed = get_allowed_add_interviews(event)
 
-        new_cart_entity = await _add_from_interview(
-            cart,
-            event,
-            add_obj.state,
-            current_url,
-            service,
-            reg_service,
-            interview_service,
-        )
-
-    cart_url = get_absolute_url_to_path(request, f"/carts/{new_cart_entity.id}")
-
-    return Response(
-        303,
-        headers=[
-            (b"Location", cart_url.value),
-        ],
-    )
-
-
-@app.router.delete("/carts/{id}/registrations/{registration_id}")
-@docs(
-    responses={
-        303: ResponseInfo("Redirect to the new cart"),
-    },
-    tags=["Cart"],
-)
-@transaction
-async def remove_registration_from_cart(
-    id: str,
-    registration_id: UUID,
-    request: Request,
-    service: CartService,
-):
-    """Remove a registration from a cart."""
-    # TODO: permissions
-    entity = check_not_found(await service.get_cart(id))
-    cart = entity.get_cart_data_model()
-    updated = cart.remove_registration(registration_id)
-    if updated == cart:
+    if interview_id not in [o.id for o in allowed]:
         raise NotFound
-
-    new_entity = CartEntity.create(updated)
-    new_entity = await service.save_cart(new_entity)
-
-    cart_url = get_absolute_url_to_path(request, f"/carts/{new_entity.id}")
-
-    return Response(
-        303,
-        headers=[
-            (b"Location", cart_url.value),
-        ],
-    )
+    return interview_id
 
 
-@app.router.get("/carts/{id}/new-interview")
-@docs(
-    responses={
-        200: ResponseInfo(
-            "An interview state response",
-        )
-    },
-    tags=["Cart"],
-)
-@serialize(IncompleteInterviewStateResponse)
-async def create_cart_add_interview_state(
-    request: Request,
-    id: str,
-    interview_id: FromQuery[str],
-    registration_id: FromQuery[Optional[UUID]],
-    config: Config,
-    event_config: EventConfig,
+def _parse_registration_data(data: dict[str, Any]) -> Registration:
+    try:
+        registration = get_converter().structure(data, Registration)
+    except BaseValidationError as e:
+        raise BodyValidationError(e)
+    return registration
+
+
+async def _add_to_cart(
+    cart: CartData,
+    old_reg: Optional[RegistrationEntity],
+    new_reg: Registration,
+    submission_id: Optional[str],
+    meta: Optional[dict[str, Any]],
     service: CartService,
-    registration_service: RegistrationService,
-    interview_service: InterviewService,
-):
-    """Get an interview state to add a registration to a cart."""
-    entity = check_not_found(await service.get_cart(id))
-    cart = entity.get_cart_data_model()
-    # TODO: permissions
-    event = check_not_found(event_config.get_event(cart.event_id))
-    # TODO: event visibility
-
-    if registration_id.value is not None:
-        registration = await _get_registration_for_change(
-            registration_id.value, registration_service
-        )
-    else:
-        registration = None
-
-    valid_interview_id = _check_interview_availability(
-        interview_id.value, event, registration
+) -> CartEntity:
+    cr = CartRegistration.create(
+        old_reg, new_reg, submission_id=submission_id, meta=meta
     )
 
-    # Build state
-    context = _get_interview_context(event)
-    initial_data = _get_interview_initial_data(event.id, registration)
-    submission_id = uuid.uuid4()
+    try:
+        new_cart = cart.add_registration(cr)
+    except CartError as e:
+        raise HTTPException(409, str(e))
 
-    target_url = get_absolute_url_to_path(request, f"/carts/{entity.id}/registrations")
-
-    state = interview_service.create_state(
-        valid_interview_id,
-        target_url=target_url.value.decode(),
-        submission_id=submission_id,
-        context=context,
-        initial_data=initial_data,
-    )
-
-    return IncompleteInterviewStateResponse(
-        state=state,
-        update_url=config.interview.update_url,
-        content=None,
-    )
+    entity = CartEntity.create(new_cart)
+    return await service.save_cart(entity)

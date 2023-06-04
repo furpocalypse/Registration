@@ -20,10 +20,10 @@ DEFAULT_CASCADE = "save-update, merge, expunge"
 """Default relationship cascade configuration."""
 
 DEFAULT_CASCADE_DELETE = "save-update, merge, expunge, delete"
-"""Default relationship cascade configuration, with delete"""
+"""Default relationship cascade configuration, with delete."""
 
 DEFAULT_CASCADE_DELETE_ORPHAN = "save-update, merge, expunge, delete, delete-orphan"
-"""Default relationship cascade configuration, with delete-orphan"""
+"""Default relationship cascade configuration, with delete-orphan."""
 
 naming_convention = {
     "ix": "ix_%(column_0_label)s",
@@ -53,6 +53,8 @@ JSONData = Annotated[
 
 
 class Base(DeclarativeBase):
+    """Entity base class."""
+
     metadata = metadata
     type_annotation_map = {
         UUID: SqlUUID(as_uuid=True),
