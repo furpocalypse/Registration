@@ -1,10 +1,12 @@
 """Web application module."""
 import argparse
+from ipaddress import IPv4Network, IPv6Network
 from pathlib import Path
 
 import uvicorn
 from blacksheep import Application, Content, HTTPException, Response
 from blacksheep.plugins import json
+from blacksheep.server.remotes.forwarding import XForwardedHeadersMiddleware
 from guardpost import Policy
 from guardpost.common import AuthenticatedRequirement
 from oes.registration.auth import TokenAuthHandler
@@ -80,6 +82,25 @@ app.middlewares.append(db_session_middleware)
 
 authorization = app.use_authorization()
 authorization.default_policy = Policy("authenticated", AuthenticatedRequirement())
+
+
+#
+@app.on_middlewares_configuration
+def configure_forwarded_headers(app: Application):
+    app.middlewares.insert(
+        0,
+        XForwardedHeadersMiddleware(
+            # Allow X-Forwarded headers from private networks
+            known_networks=[
+                IPv4Network("127.0.0.0/8"),
+                IPv4Network("10.0.0.0/8"),
+                IPv4Network("172.16.0.0/12"),
+                IPv4Network("192.168.0.0/16"),
+                IPv6Network("fc00::/7"),
+                IPv6Network("::1/128"),
+            ]
+        ),
+    )
 
 
 @app.on_start

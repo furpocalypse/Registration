@@ -1,0 +1,58 @@
+---
+# Example events config
+
+- id: example-event
+  name: Example Event
+  description: |
+    An example event.
+  date: 2024-07-04
+  open: true
+  visible: true
+
+  # Registration options
+  registration_options:
+    - id: attendee
+      name: Attendee
+      description: Attendee level
+    - id: vip
+      name: VIP
+      description: VIP upgrade
+
+  # Interviews available for adding a registration
+  add_interviews:
+    - id: new-registration
+      name: New Registration
+      when: true
+
+  # Interviews available for changing a registration
+  change_interviews:
+    - id: update-registration
+      name: Update Registration
+      when: true
+
+  # Basic pricing rules
+  pricing_rules:
+    - name: Attendee Registration
+      description: Attendee level registration
+      price: 5000
+      modifiers:
+        - type_id: early-bird
+          name: Early Bird Discount
+          amount: -500
+          when: true
+      when:
+        - "'attendee' in added_option_ids"
+
+    - name: VIP Upgrade
+      description: VIP level upgrade
+      price: 2500
+      when:
+        - "'vip' in added_option_ids"
+
+  # Display options
+  display_options:
+    # Registration display template in the self-service view.
+    registration:
+      title: "{{ registration.display_name }}"
+      subtitle: Attendee
+      description: ""
