@@ -10,17 +10,6 @@ repos:
       - id: check-added-large-files
         exclude: (package-lock\.json|poetry\.lock)$
 
-  - repo: https://github.com/PyCQA/docformatter
-    rev: v1.7.1
-    hooks:
-      - id: docformatter
-        name: docformatter
-        args:
-          - --in-place
-          - --black
-          - --wrap-summaries=88
-          - --wrap-descriptions=88
-
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:

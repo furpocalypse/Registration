@@ -132,15 +132,13 @@ class UpdateRequest:
 WebhookParser = Callable[[WebhookRequestInfo], object]
 """Callable to parse a webhook request and return the parsed body.
 
-Must raise
-:class: `ValidationError` if the parsing fails.
+Must raise :class:`ValidationError` if the parsing fails.
 """
 
 WebhookValidator = Callable[[WebhookRequestInfo, object], object]
 """Callable to validate a webhook request and return the validated body.
 
-Must raise
-:class: `ValidationError` if the validation fails.
+Must raise :class:`ValidationError` if the validation fails.
 """
 
 UpdateHandler = Callable[[UpdateRequest], Awaitable[PaymentServiceCheckout]]
