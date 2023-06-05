@@ -20,6 +20,7 @@ from oes.registration.payment.base import (
     ValidationError,
 )
 from oes.registration.serialization import get_converter
+from oes.registration.services.auth import AuthService
 from oes.registration.services.cart import CartService, validate_changes_apply
 from oes.registration.services.checkout import CheckoutService, apply_checkout_changes
 from oes.registration.services.event import EventService
@@ -189,6 +190,7 @@ async def update_checkout(
     body: FromJSON[dict],
     checkout_service: CheckoutService,
     registration_service: RegistrationService,
+    auth_service: AuthService,
     event_service: EventService,
     db: AsyncSession,
 ) -> Response:
@@ -224,7 +226,7 @@ async def update_checkout(
 
     try:
         response = await _handle_update(
-            registration_service, event_service, checkout, result
+            registration_service, auth_service, event_service, checkout, result
         )
         await db.commit()
         return response
@@ -239,6 +241,7 @@ async def update_checkout(
 
 async def _handle_update(
     registration_service: RegistrationService,
+    auth_service: AuthService,
     event_service: EventService,
     checkout_entity: CheckoutEntity,
     checkout_result: PaymentServiceCheckout,
@@ -247,7 +250,9 @@ async def _handle_update(
         checkout_result.state == CheckoutState.complete
         and not checkout_entity.changes_applied
     ):
-        updated = await apply_checkout_changes(registration_service, checkout_entity)
+        updated = await apply_checkout_changes(
+            registration_service, auth_service, checkout_entity
+        )
         cart_data = checkout_entity.get_cart_data()
         event_id = cart_data.event_id
 

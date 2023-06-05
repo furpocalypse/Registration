@@ -234,6 +234,7 @@ class RegistrationEntity(Base):
             state=reg.state,
             version=reg.version,
             date_created=get_now(),
+            accounts=[],
         )
         entity._update_properties_from_model(reg)
 

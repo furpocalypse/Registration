@@ -1,10 +1,10 @@
 """Self-service views."""
-import uuid
 from typing import Optional
 
 from blacksheep import FromQuery
 from oes.registration.app import app
 from oes.registration.docs import docs_helper
+from oes.registration.models.auth import User
 from oes.registration.models.event import EventConfig
 from oes.registration.services.registration import (
     RegistrationService,
@@ -28,9 +28,9 @@ from oes.registration.views.responses import (
 )
 async def list_self_service_registration(
     event_id: FromQuery[Optional[str]],
-    # TODO: account ID
     service: RegistrationService,
     event_config: EventConfig,
+    user: User,
 ) -> SelfServiceRegistrationListResponse:
     """List self-service registrations."""
     if event_id.value:
@@ -42,7 +42,7 @@ async def list_self_service_registration(
     # TODO: permissions
 
     registrations = await service.list_self_service_registrations(
-        uuid.uuid4(),  # TODO: account ID
+        user.id,
         event_id=event_id.value,
     )
 

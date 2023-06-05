@@ -17,6 +17,7 @@ from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper, serialize
 from oes.registration.entities.cart import CartEntity
 from oes.registration.entities.registration import RegistrationEntity
+from oes.registration.models.auth import User
 from oes.registration.models.cart import CartData, CartError, CartRegistration
 from oes.registration.models.config import Config
 from oes.registration.models.event import Event, EventConfig
@@ -316,6 +317,7 @@ async def create_cart_add_interview_state(
     service: CartService,
     registration_service: RegistrationService,
     interview_service: InterviewService,
+    user: User,
 ) -> IncompleteInterviewStateResponse:
     """Get an interview state to add a registration to a cart."""
     entity = check_not_found(await service.get_cart(id))
@@ -337,7 +339,7 @@ async def create_cart_add_interview_state(
 
     # Build state
     context = _get_interview_context(event)
-    initial_data = _get_interview_initial_data(event.id, registration)
+    initial_data = _get_interview_initial_data(event.id, registration, user)
     submission_id = uuid.uuid4()
 
     target_url = get_absolute_url_to_path(request, f"/carts/{entity.id}/registrations")
@@ -386,10 +388,12 @@ def _get_interview_context(event: Event) -> dict[str, Any]:
 def _get_interview_initial_data(
     event_id: str,
     registration: Optional[RegistrationEntity],
+    user: Optional[User],
 ) -> dict[str, Any]:
     if registration:
         model = registration.get_model()
         registration_data = get_converter().unstructure(model)
+        meta = {}
     else:
         model = Registration(
             id=uuid.uuid4(),
@@ -400,8 +404,17 @@ def _get_interview_initial_data(
         )
         registration_data = get_converter().unstructure(model)
 
+        meta = (
+            {
+                "account_id": str(user.id),
+            }
+            if user
+            else {}
+        )
+
     return {
         "registration": registration_data,
+        "meta": meta,
     }
 
 

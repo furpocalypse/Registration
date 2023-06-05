@@ -3,6 +3,7 @@ from collections.abc import Iterable, Sequence
 from typing import Optional
 from uuid import UUID
 
+from oes.registration.entities.auth import AccountEntity
 from oes.registration.entities.event_stats import EventStatsEntity
 from oes.registration.entities.registration import RegistrationEntity
 from oes.registration.log import AuditLogType, audit_log
@@ -12,8 +13,10 @@ from oes.registration.models.registration import (
     SelfServiceRegistration,
 )
 from oes.registration.serialization import get_converter
+from oes.registration.services.auth import AuthService
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import contains_eager
 
 
 class RegistrationService:
@@ -80,22 +83,26 @@ class RegistrationService:
 
     async def list_self_service_registrations(
         self,
-        account_id: UUID,  # TODO
+        account_id: UUID,
         event_id: Optional[str] = None,
     ) -> Sequence[RegistrationEntity]:
         """List self-service registrations."""
-        q = select(RegistrationEntity)
+        q = (
+            select(RegistrationEntity)
+            .join(RegistrationEntity.accounts)
+            .where(AccountEntity.id == account_id)
+        )
 
         if event_id is not None:
             q = q.where(RegistrationEntity.event_id == event_id)
 
-        # TODO: account_id
         q = q.where(RegistrationEntity.state == RegistrationState.created)
 
         q = q.order_by(RegistrationEntity.date_created)
 
+        q = q.options(contains_eager(RegistrationEntity.accounts))
         res = await self.db.execute(q)
-        return res.scalars().all()
+        return res.unique().scalars().all()
 
 
 def render_self_service_registration(
@@ -178,3 +185,14 @@ def assign_registration_numbers(
             raise ValueError("Event ID does not match")
         if reg.state == RegistrationState.created:
             reg.assign_number(event_stats)
+
+
+async def add_account_to_registration(
+    account_id: UUID,
+    registration: RegistrationEntity,
+    auth_service: AuthService,
+):
+    """Associate an account with a registration."""
+    account = await auth_service.get_account(account_id)
+    if account:
+        registration.accounts.append(account)

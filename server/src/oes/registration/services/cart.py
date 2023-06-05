@@ -1,13 +1,18 @@
 """Cart service."""
 from typing import Optional
+from uuid import UUID
 
 from oes.registration.entities.cart import CartEntity
 from oes.registration.entities.registration import RegistrationEntity
-from oes.registration.models.cart import CartData
+from oes.registration.models.cart import CartData, CartRegistration
 from oes.registration.models.event import Event
 from oes.registration.models.pricing import PricingRequest, PricingResult
 from oes.registration.pricing import default_pricing
-from oes.registration.services.registration import RegistrationService
+from oes.registration.services.auth import AuthService
+from oes.registration.services.registration import (
+    RegistrationService,
+    add_account_to_registration,
+)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
@@ -88,12 +93,14 @@ async def validate_changes_apply(
 
 async def apply_changes(
     registration_service: RegistrationService,
+    auth_service: AuthService,
     cart_data: CartData,
 ) -> list[RegistrationEntity]:
     """Apply all registration changes in a checkout.
 
     Args:
         registration_service: The :class:`RegistrationService`.
+        auth_service: The :class:`AuthService`.
         cart_data: The :class:`CartData` to apply.
 
     Returns:
@@ -118,7 +125,21 @@ async def apply_changes(
             # TODO: should we check if the old_data is blank?
             registration_entity = RegistrationEntity.create_from_cart(cart_registration)
             await registration_service.create_registration(registration_entity)
+            await _add_account(cart_registration, registration_entity, auth_service)
 
         results.append(registration_entity)
 
     return results
+
+
+async def _add_account(
+    cart_registration: CartRegistration,
+    entity: RegistrationEntity,
+    service: AuthService,
+):
+    """Associate the registration with the account ID in the metadata."""
+    meta = cart_registration.meta or {}
+    account_id = meta.get("account_id")
+
+    if account_id:
+        await add_account_to_registration(UUID(account_id), entity, service)

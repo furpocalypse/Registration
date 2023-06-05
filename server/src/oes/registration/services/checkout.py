@@ -21,6 +21,7 @@ from oes.registration.payment.base import (
     UpdateRequest,
 )
 from oes.registration.payment.config import PaymentServices
+from oes.registration.services.auth import AuthService
 from oes.registration.services.cart import apply_changes
 from oes.registration.services.registration import RegistrationService
 from oes.registration.util import get_now
@@ -322,6 +323,7 @@ class CheckoutService:
 
 async def apply_checkout_changes(
     registration_service: RegistrationService,
+    auth_service: AuthService,
     checkout_entity: CheckoutEntity,
 ) -> list[RegistrationEntity]:
     """Apply all registration changes in a checkout.
@@ -330,6 +332,7 @@ async def apply_checkout_changes(
 
     Args:
         registration_service: The :class:`RegistrationService`.
+        auth_service: The :class:`AuthService`.
         checkout_entity: The :class:`CheckoutEntity` to apply.
 
     Returns:
@@ -346,7 +349,7 @@ async def apply_checkout_changes(
 
     cart_data = checkout_entity.get_cart_data()
 
-    results = await apply_changes(registration_service, cart_data)
+    results = await apply_changes(registration_service, auth_service, cart_data)
 
     checkout_entity.changes_applied = True
     return results
