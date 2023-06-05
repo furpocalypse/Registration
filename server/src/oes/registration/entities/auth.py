@@ -1,7 +1,7 @@
 """Auth entities."""
 from __future__ import annotations
 
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from blacksheep.messages import datetime
@@ -17,6 +17,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 CREDENTIAL_TYPE_LEN = 32
 CREDENTIAL_ID_MAX_LEN = 1024
+
+if TYPE_CHECKING:
+    from oes.registration.entities.registration import RegistrationEntity
 
 
 class AccountEntity(Base):
@@ -35,6 +38,12 @@ class AccountEntity(Base):
         cascade=DEFAULT_CASCADE_DELETE_ORPHAN,
     )
     """:class:`CredentialEntity` instances associated with this account."""
+
+    registrations: Mapped[list[RegistrationEntity]] = relationship(
+        "RegistrationEntity",
+        secondary="registration_account",
+        back_populates="accounts",
+    )
 
     def __repr__(self):
         return (

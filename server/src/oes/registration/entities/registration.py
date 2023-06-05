@@ -4,6 +4,7 @@ from __future__ import annotations
 import copy
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional, Union
+from uuid import UUID
 
 from oes.registration.entities.base import (
     DEFAULT_MAX_ENUM_LENGTH,
@@ -20,11 +21,12 @@ from oes.registration.models.registration import (
 )
 from oes.registration.serialization import get_converter
 from oes.registration.util import get_now, merge_dict
-from sqlalchemy import Index, String
+from sqlalchemy import ForeignKey, Index, String
 from sqlalchemy.dialects.postgresql import JSONB
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
+    from oes.registration.entities.auth import AccountEntity
     from oes.registration.models.cart import CartRegistration, InvalidChangeError
 
 
@@ -89,6 +91,13 @@ class RegistrationEntity(Base):
 
     extra_data: Mapped[JSONData]
     """Additional data."""
+
+    accounts: Mapped[list[AccountEntity]] = relationship(
+        "AccountEntity",
+        secondary="registration_account",
+        back_populates="registrations",
+    )
+    """Accounts associated with this registration."""
 
     _updated: bool = False
 
@@ -303,3 +312,17 @@ class RegistrationEntity(Base):
         event_stats.next_number += 1
         self.mark_updated()
         return self.number
+
+
+class RegistrationAccount(Base):
+    """Entity to map registrations to accounts."""
+
+    __tablename__ = "registration_account"
+
+    registration_id: Mapped[UUID] = mapped_column(
+        ForeignKey("registration.id"), primary_key=True
+    )
+    """The registration ID."""
+
+    account_id: Mapped[UUID] = mapped_column(ForeignKey("account.id"), primary_key=True)
+    """The account ID."""
