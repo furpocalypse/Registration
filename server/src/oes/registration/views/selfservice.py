@@ -39,8 +39,6 @@ async def list_self_service_registration(
     else:
         add_options = []
 
-    # TODO: permissions
-
     registrations = await service.list_self_service_registrations(
         user.id,
         event_id=event_id.value,
@@ -50,8 +48,7 @@ async def list_self_service_registration(
 
     for reg in registrations:
         event = event_config.get_event(reg.event_id)
-        # TODO: check event visibility
-        if event:
+        if event and event.is_visible_to(user):
             change_options = get_allowed_change_interviews(event, reg)
             model = render_self_service_registration(event, reg)
             results.append(

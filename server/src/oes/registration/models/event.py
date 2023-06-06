@@ -11,7 +11,7 @@ from oes.registration.models.identifier import validate_identifier
 from oes.template import Condition, Template, evaluate
 
 if TYPE_CHECKING:
-    from oes.registration.models.auth import AccessToken
+    from oes.registration.models.auth import User
 
 
 class Whenable(ABC):
@@ -150,9 +150,13 @@ class Event:
     display_options: EventDisplayOptions = EventDisplayOptions()
     """Display options."""
 
-    def is_visible_to(self, access_token: AccessToken) -> bool:
+    def is_visible_to(self, user: User) -> bool:
         """Get whether the event is visible to the given user."""
-        return access_token.is_admin or self.visible
+        return self.visible or user.is_admin
+
+    def is_open_to(self, user: User) -> bool:
+        """Get whether the event is open to the given user."""
+        return self.open and self.is_visible_to(user) or user.is_admin
 
 
 @frozen
