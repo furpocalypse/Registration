@@ -1,5 +1,6 @@
 """Web application module."""
 import argparse
+from functools import partial
 from ipaddress import IPv4Network, IPv6Network
 from pathlib import Path
 
@@ -9,8 +10,15 @@ from blacksheep.plugins import json
 from blacksheep.server.remotes.forwarding import XForwardedHeadersMiddleware
 from guardpost import Policy
 from guardpost.common import AuthenticatedRequirement
-from oes.registration.auth import TokenAuthHandler
-from oes.registration.config import load_config, load_event_config
+from loguru import logger
+from oes.registration.auth import (
+    TokenAuthHandler,
+    require_admin,
+    require_cart,
+    require_event,
+    require_self_service,
+)
+from oes.registration.config import CommandLineConfig, load_config, load_event_config
 from oes.registration.database import (
     DBConfig,
     db_session_factory,
@@ -19,6 +27,7 @@ from oes.registration.database import (
 from oes.registration.docs import docs
 from oes.registration.http_client import setup_http_client, shutdown_http_client
 from oes.registration.log import setup_logging
+from oes.registration.models.config import Config
 from oes.registration.payment.config import load_services
 from oes.registration.serialization import get_converter
 from oes.registration.serialization.json import json_dumps, json_loads
@@ -87,11 +96,7 @@ app.exceptions_handlers[BodyValidationError] = _validation_error_handler
 app.exceptions_handlers[409] = _conflict_error_handler
 app.middlewares.append(db_session_middleware)
 
-authorization = app.use_authorization()
-authorization.default_policy = Policy("authenticated", AuthenticatedRequirement())
 
-
-#
 @app.on_middlewares_configuration
 def _configure_forwarded_headers(app: Application):
     app.middlewares.insert(
@@ -110,14 +115,7 @@ def _configure_forwarded_headers(app: Application):
     )
 
 
-@app.on_start
-async def _setup_app(app: Application):
-    # TODO: specify paths
-    config = load_config(Path("config.yml"))
-    events = load_event_config(Path("events.yml"))
-    app.services.add_instance(config)
-    app.services.add_instance(events)
-
+async def _setup_app(config: Config, app: Application):
     db_config = DBConfig.create(config.database.url)
     app.services.add_instance(db_config)
     app.services.add_scoped_by_factory(db_session_factory, AsyncSession)
@@ -147,16 +145,31 @@ def app_factory():
     """Set up and return the ASGI app."""
     # There's no way to pass settings from the main uvicorn process to the worker
     # processes, but we can just parse the command line arguments again
-    args = parse_args()
+    cmd_config = parse_args()
 
-    # TODO: pass the config to the app so we don't have to parse it twice
-    config = load_config(Path("config.yml"))
+    config = load_config(cmd_config.config)
+    events = load_event_config(cmd_config.events)
+    app.services.add_instance(config)
+    app.services.add_instance(events)
+
+    # pass the config to the on_start hook
+    app.on_start(partial(_setup_app, config))
 
     # set up logging
-    setup_logging(debug=args.debug)
+    setup_logging(debug=cmd_config.debug)
 
-    # setup authentication
-    app.use_authentication().add(TokenAuthHandler(config))
+    app.services.add_instance(cmd_config)
+
+    # set up authentication
+    app.use_authentication().add(TokenAuthHandler(cmd_config, config))
+
+    # set up authorization
+    authorization = app.use_authorization()
+    authorization.default_policy = Policy("authenticated", AuthenticatedRequirement())
+    authorization.add(require_event)
+    authorization.add(require_cart)
+    authorization.add(require_self_service)
+    authorization.add(require_admin)
 
     # set up CORS
 
@@ -168,6 +181,9 @@ def app_factory():
             "Content-Type",
         ),
     )
+
+    if cmd_config.insecure:
+        logger.warning("Starting with insecure options")
 
     return app
 
@@ -195,7 +211,7 @@ def run():
         )
 
 
-def parse_args():
+def parse_args() -> CommandLineConfig:
     """Parse command line arguments."""
     # maybe look at different parsers in the future
     parser = argparse.ArgumentParser(
@@ -221,6 +237,12 @@ def parse_args():
         help="watch file changes and reload the server for development",
         default=False,
     )
+    parser.add_argument(
+        "--insecure", action="store_true", help="enable insecure settings"
+    )
+    parser.add_argument(
+        "--no-auth", action="store_true", help="disable authorization checks"
+    )
 
     parser.add_argument(
         "-c",
@@ -237,7 +259,17 @@ def parse_args():
         default=Path("events.yml"),
     )
 
-    return parser.parse_args()
+    args = parser.parse_args()
+    return CommandLineConfig(
+        port=args.port,
+        bind=args.bind,
+        debug=args.debug,
+        reload=args.reload,
+        insecure=args.insecure,
+        no_auth=args.no_auth,
+        config=args.config,
+        events=args.events,
+    )
 
 
 # Import views

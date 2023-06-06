@@ -4,6 +4,7 @@ from uuid import UUID
 
 from attrs import frozen
 from blacksheep import FromForm, FromQuery, HTTPException, Request, allow_anonymous
+from blacksheep.exceptions import Forbidden
 from blacksheep.server.openapi.common import ResponseInfo
 from loguru import logger
 from oes.registration.app import app
@@ -201,15 +202,17 @@ async def get_webauthn_challenge(
     if not account:
         raise HTTPException(401)
 
-    # TODO: ensure origin is one of a set of allowed values for auth
     origin = (request.get_first_header(b"Origin") or b"").decode()
 
-    challenge_str, options = get_webauthn_registration_challenge(
-        config,
-        account_id=account.id,
-        user_name=user.email or "Guest",  # TODO
-        origin=origin,
-    )
+    try:
+        challenge_str, options = get_webauthn_registration_challenge(
+            config,
+            account_id=account.id,
+            user_name=user.email or "Guest",  # TODO
+            origin=origin,
+        )
+    except AuthorizationError:
+        raise Forbidden
 
     return WebAuthChallengeResponse(challenge=challenge_str, options=options)
 

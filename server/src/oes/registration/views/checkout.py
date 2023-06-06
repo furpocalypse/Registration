@@ -2,11 +2,20 @@
 from typing import Optional
 from uuid import UUID
 
-from blacksheep import Content, FromBytes, FromJSON, FromQuery, HTTPException, Response
+from blacksheep import (
+    Content,
+    FromBytes,
+    FromJSON,
+    FromQuery,
+    HTTPException,
+    Response,
+    auth,
+)
 from blacksheep.exceptions import NotFound
 from blacksheep.server.openapi.common import ContentInfo, ResponseInfo
 from loguru import logger
 from oes.registration.app import app
+from oes.registration.auth import RequireCart
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState
@@ -37,6 +46,7 @@ from oes.registration.views.responses import (
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
+@auth(RequireCart)
 @app.router.get("/carts/{cart_id}/checkout-methods")
 @docs_helper(
     response_type=list[CheckoutMethod],
@@ -77,6 +87,7 @@ async def list_available_checkout_methods(
     return methods
 
 
+@auth(RequireCart)
 @app.router.post("/carts/{cart_id}/checkout")
 @docs(
     responses={
@@ -158,6 +169,7 @@ async def create_checkout(
     return response
 
 
+@auth(RequireCart)
 @app.router.put("/checkouts/{id}/cancel")
 @docs(
     tags=["Checkout"],
@@ -175,6 +187,7 @@ async def cancel_checkout(id: UUID, checkout_service: CheckoutService) -> Respon
         raise HTTPException(409, "Checkout could not be canceled")
 
 
+@auth(RequireCart)
 @app.router.post("/checkouts/{id}/update")
 @docs(
     responses={

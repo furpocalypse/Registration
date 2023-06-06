@@ -15,10 +15,10 @@ from jwt import InvalidTokenError
 from loguru import logger
 from oes.registration.entities.auth import AccountEntity, CredentialEntity
 from oes.registration.models.auth import (
+    DEFAULT_SCOPES,
     AccessToken,
     CredentialType,
     RefreshToken,
-    Scope,
     TokenResponse,
     WebAuthnAuthenticationChallenge,
     WebAuthnRegistrationChallenge,
@@ -44,8 +44,6 @@ from webauthn.helpers.structs import (
     UserVerificationRequirement,
 )
 from webauthn.registration.verify_registration_response import VerifiedRegistration
-
-DEFAULT_SCOPES = (Scope.self_service,)
 
 
 class AuthorizationError(ValueError):

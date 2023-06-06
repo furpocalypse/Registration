@@ -42,13 +42,30 @@ class Scope(str, Enum):
     """Authorization scopes."""
 
     admin = "admin"
-    """Full administration privileges."""
+    """May use administration endpoints."""
+
+    cart = "cart"
+    """May use cart and checkout endpoints."""
+
+    event = "event"
+    """May use event endpoints."""
 
     self_service = "self-service"
     """May use self-service endpoints and manage one's own registrations."""
 
 
 Scopes = NewType("Scopes", frozenset[str])
+
+DEFAULT_SCOPES = Scopes(
+    frozenset(
+        {
+            Scope.event,
+            Scope.cart,
+            Scope.self_service,
+        }
+    )
+)
+"""The default scopes users will receive."""
 
 
 class TokenBase:

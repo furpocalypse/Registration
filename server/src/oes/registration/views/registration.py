@@ -3,7 +3,7 @@ from typing import Optional, Union
 from uuid import UUID
 
 from attrs import Factory, field, frozen
-from blacksheep import Content, HTTPException, Request, Response
+from blacksheep import Content, HTTPException, Request, Response, auth
 from blacksheep.server.openapi.common import (
     ContentInfo,
     ParameterInfo,
@@ -11,6 +11,7 @@ from blacksheep.server.openapi.common import (
     ResponseInfo,
 )
 from oes.registration.app import app
+from oes.registration.auth import RequireAdmin
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.registration import RegistrationEntity
@@ -55,6 +56,7 @@ class UpdateRegistrationRequest:
     preferred_name: Optional[str] = None
 
 
+@auth(RequireAdmin)
 @app.router.get("/registrations")
 @docs_helper(
     response_type=list[RegistrationListResponse],
@@ -66,12 +68,13 @@ async def list_registrations(
     reg: RegistrationService,
     page: int,
     per_page: int,
-) -> list[RegistrationListResponse]:
+) -> list[Registration]:
     """Search registrations."""
     results = await reg.list_registrations(page=page, per_page=per_page)
     return [r.get_model() for r in results]
 
 
+@auth(RequireAdmin)
 @app.router.post("/registrations")
 @docs(
     responses={
@@ -116,6 +119,7 @@ async def create_registration(
     return registration_response(entity.get_model())
 
 
+@auth(RequireAdmin)
 @app.router.get("/registrations/{id}")
 @docs(
     responses={
@@ -137,6 +141,7 @@ async def read_registration(
     return registration_response(reg.get_model())
 
 
+@auth(RequireAdmin)
 @app.router.put("/registrations/{id}")
 @docs(
     parameters={
@@ -181,6 +186,7 @@ async def update_registration(
     return registration_response(reg.get_model())
 
 
+@auth(RequireAdmin)
 @app.router.put("/registrations/{id}/complete")
 @docs(
     responses={
@@ -209,6 +215,7 @@ async def complete_registration(
     return registration_response(reg.get_model())
 
 
+@auth(RequireAdmin)
 @app.router.put("/registrations/{id}/cancel")
 @docs(
     responses={

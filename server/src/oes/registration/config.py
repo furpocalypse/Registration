@@ -2,12 +2,27 @@
 from collections.abc import Sequence
 from pathlib import Path
 
+from attr import frozen
 from oes.registration.models.config import Config
 from oes.registration.models.event import Event, EventConfig
 from oes.registration.serialization import get_config_converter
 from ruamel.yaml import YAML
 
 yaml = YAML(typ="safe")
+
+
+@frozen
+class CommandLineConfig:
+    """Command line config settings."""
+
+    port: int
+    bind: str
+    debug: bool
+    reload: bool
+    insecure: bool
+    no_auth: bool
+    config: Path
+    events: Path
 
 
 def load_config(path: Path) -> Config:

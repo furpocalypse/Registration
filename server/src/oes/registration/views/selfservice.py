@@ -1,8 +1,9 @@
 """Self-service views."""
 from typing import Optional
 
-from blacksheep import FromQuery
+from blacksheep import FromQuery, auth
 from oes.registration.app import app
+from oes.registration.auth import RequireSelfService
 from oes.registration.docs import docs_helper
 from oes.registration.models.auth import User
 from oes.registration.models.event import EventConfig
@@ -20,6 +21,7 @@ from oes.registration.views.responses import (
 )
 
 
+@auth(RequireSelfService)
 @app.router.get("/self-service/registrations")
 @docs_helper(
     response_type=SelfServiceRegistrationListResponse,

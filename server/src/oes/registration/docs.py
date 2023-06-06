@@ -54,7 +54,11 @@ docs.components.security_schemes = {
         flows=OAuthFlows(
             client_credentials=OAuthFlow(
                 scopes={
-                    Scope.self_service.value: "Allows access to self-service endpoints",
+                    Scope.admin: "May use administration endpoints.",
+                    Scope.cart: "May use cart and checkout endpoints.",
+                    Scope.event: "May use event endpoints.",
+                    Scope.self_service: "May use self-service endpoints and manage "
+                    "one's own registrations.",
                 },
                 refresh_url="/auth/token",
                 token_url="/auth/new-account",

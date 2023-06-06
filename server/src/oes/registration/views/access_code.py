@@ -3,8 +3,9 @@ from datetime import datetime
 from typing import Optional
 
 from attrs import frozen
-from blacksheep import Response
+from blacksheep import Response, auth
 from oes.registration.app import app
+from oes.registration.auth import RequireAdmin
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.models.access_code import AccessCodeSettings
@@ -24,6 +25,7 @@ class CreateAccessCodeRequest:
     data: AccessCodeSettings
 
 
+@auth(RequireAdmin)
 @app.router.get("/access-code")
 @docs_helper(
     response_type=list[AccessCodeListResponse],
@@ -50,6 +52,7 @@ async def list_access_codes(
     ]
 
 
+@auth(RequireAdmin)
 @app.router.post("/access-code")
 @docs_helper(
     response_type=AccessCodeResponse,
@@ -73,6 +76,7 @@ async def create_access_code(
     return AccessCodeResponse.create(result)
 
 
+@auth(RequireAdmin)
 @app.router.delete("/access-code/{code}")
 @docs(tags=["Access Code"])
 @transaction

@@ -4,7 +4,15 @@ from typing import Any, Optional, Union
 from uuid import UUID
 
 from attrs import frozen
-from blacksheep import Content, FromJSON, FromQuery, HTTPException, Request, Response
+from blacksheep import (
+    Content,
+    FromJSON,
+    FromQuery,
+    HTTPException,
+    Request,
+    Response,
+    auth,
+)
 from blacksheep.exceptions import NotFound
 from blacksheep.messages import get_absolute_url_to_path
 from blacksheep.server.openapi.common import ContentInfo, RequestBodyInfo, ResponseInfo
@@ -13,6 +21,7 @@ from cattrs import BaseValidationError
 from oes.interview.response import IncompleteInterviewStateResponse
 from oes.interview.state import InvalidStateError
 from oes.registration.app import app
+from oes.registration.auth import RequireAdmin, RequireCart, RequireSelfService
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper, serialize
 from oes.registration.entities.cart import CartEntity
@@ -56,6 +65,7 @@ AddRegistrationRequest = Union[
 ]
 
 
+@auth(RequireAdmin)
 @app.router.post("/carts")
 @docs(tags=["Cart"], responses={303: ResponseInfo("Redirect to the created cart")})
 @transaction
@@ -95,6 +105,7 @@ async def create_cart(
     )
 
 
+@auth(RequireCart)
 @app.router.get("/carts/empty")
 @docs(
     responses={
@@ -123,6 +134,7 @@ async def read_empty_cart(
     )
 
 
+@auth(RequireCart)
 @app.router.get("/carts/{id}")
 @docs(
     responses={200: ResponseInfo("The cart data", content=[ContentInfo(CartData)])},
@@ -148,6 +160,7 @@ async def read_cart(id: str, service: CartService) -> Response:
     )
 
 
+@auth(RequireCart)
 @app.router.get("/carts/{id}/pricing-result")
 @docs_helper(
     response_type=PricingResultResponse,
@@ -186,6 +199,7 @@ async def read_cart_pricing_result(
     return PricingResultResponse.create(result)
 
 
+@auth(RequireCart)
 @app.router.post("/carts/{id}/registrations")
 @docs(
     request_body=RequestBodyInfo(
@@ -262,6 +276,7 @@ async def add_registration_to_cart(
     )
 
 
+@auth(RequireCart)
 @app.router.delete("/carts/{id}/registrations/{registration_id}")
 @docs(
     responses={
@@ -297,6 +312,7 @@ async def remove_registration_from_cart(
     )
 
 
+@auth(RequireSelfService)
 @app.router.get("/carts/{id}/new-interview")
 @docs(
     responses={

@@ -1,13 +1,16 @@
 """Event views."""
 from collections.abc import Sequence
 
+from blacksheep import auth
 from oes.registration.app import app
+from oes.registration.auth import RequireEvent
 from oes.registration.docs import docs_helper
 from oes.registration.models.event import Event, EventConfig
 from oes.registration.util import check_not_found
 from oes.registration.views.responses import EventResponse
 
 
+@auth(RequireEvent)
 @app.router.get("/events")
 @docs_helper(
     response_type=list[EventResponse],
@@ -19,6 +22,7 @@ async def list_events(events: EventConfig) -> Sequence[Event]:
     return events.events
 
 
+@auth(RequireEvent)
 @app.router.get("/events/{event_id}")
 @docs_helper(response_type=EventResponse, response_summary="The event", tags=["Event"])
 async def read_event(
