@@ -216,7 +216,7 @@ async def update_checkout(
     payment_service = checkout.service
     external_id = checkout.external_id
 
-    cart_data = checkout.cart_data
+    cart_data = checkout.get_cart_data()
 
     _validate_checkout_and_event(checkout, cart_data, events, user)
 

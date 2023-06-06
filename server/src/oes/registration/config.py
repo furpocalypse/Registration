@@ -17,6 +17,7 @@ class CommandLineConfig:
 
     port: int
     bind: str
+    root_path: str
     debug: bool
     reload: bool
     insecure: bool

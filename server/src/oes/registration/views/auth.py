@@ -202,7 +202,7 @@ async def get_webauthn_challenge(
     if not account:
         raise HTTPException(401)
 
-    origin = (request.get_first_header(b"Origin") or b"").decode()
+    origin = _get_origin(request)
 
     try:
         challenge_str, options = get_webauthn_registration_challenge(
@@ -236,7 +236,7 @@ async def create_webauthn_registration(
     user: User,
 ) -> TokenResponse:
     """Create a WebAuthn registration."""
-    origin = (request.get_first_header(b"Origin") or b"").decode()
+    origin = _get_origin(request)
 
     try:
         account_id, verified = verify_webauthn_registration_response(
@@ -282,7 +282,7 @@ async def get_webauthn_auth_challenge(
     config: Config,
 ) -> WebAuthChallengeResponse:
     """Get a WebAuthn authentication challenge."""
-    origin = (request.get_first_header(b"Origin") or b"").decode()
+    origin = _get_origin(request)
 
     try:
         challenge, options = await get_webauthn_authentication_challenge(
@@ -315,7 +315,7 @@ async def complete_webauthn_auth_challenge(
     config: Config,
 ) -> TokenResponse:
     """Complete WebAuthn authentication."""
-    origin = (request.get_first_header(b"Origin") or b"").decode()
+    origin = _get_origin(request)
 
     try:
         return await verify_webauthn_authentication_response(
@@ -327,3 +327,15 @@ async def complete_webauthn_auth_challenge(
         )
     except AuthorizationError:
         raise HTTPException(401)
+
+
+def _get_origin(
+    request: Request,
+) -> str:
+    origin_header = request.get_first_header(b"Origin")
+    if origin_header:
+        return origin_header.decode()
+    else:
+        # if no Origin is set, it's not a CORS request, so assume the origin is the
+        # requested host
+        return f"{request.scheme}://{request.host}"

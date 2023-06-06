@@ -1,0 +1,56 @@
+---
+interviews:
+  - id: new-registration
+    questions:
+      - id: name
+        title: Name
+        description: |
+          Enter your legal name as it appears on your government-issued photo ID.
+        fields:
+          - set: registration.first_name
+            type: text
+            label: First Name
+          - set: registration.last_name
+            type: text
+            label: Last Name
+
+      - id: registration-option
+        title: Registration Level
+        description: |
+          Choose a registration level.
+        fields:
+          - set: registration.option_ids
+            type: select
+            label: Level
+            default: 0
+            options:
+              - label: Standard
+                value: [standard]
+              - label: VIP
+                value: [standard, vip]
+
+    steps:
+      # Collect the following information
+      - eval:
+          - registration.first_name
+          - registration.last_name
+
+      # explicitly ask, since option_ids is already set and empty
+      - ask: registration-option
+
+  - id: update-registration
+    questions:
+      - id: update-name
+        title: Name
+        description: |
+          Choose your updated name
+        fields:
+          - set: registration.first_name
+            type: text
+            label: First Name
+          - set: registration.last_name
+            type: text
+            label: Last Name
+
+    steps:
+      - ask: update-name

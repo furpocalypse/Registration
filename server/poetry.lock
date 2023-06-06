@@ -970,9 +970,8 @@ server = ["blacksheep (>=1.2.12,<2.0.0)", "importlib-metadata (>=6.0.0,<7.0.0)",
 type = "git"
 url = "https://github.com/Open-Event-Systems/interview.git"
 reference = "main"
-resolved_reference = "7521f2b04e1af8c0b6d6070bbd415c56c5cd9430"
+resolved_reference = "aa5f99923a439481dd3d33401f5d579a173295df"
 subdirectory = "python"
-
 [[package]]
 name = "oes-template"
 version = "0.2.0"

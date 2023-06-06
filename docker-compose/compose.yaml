@@ -12,13 +12,14 @@ configs:
   events:
     # Must be made readable by uid or gid 1000
     file: ./events.yml
+  interviews:
+    # Must be made readable by uid or gid 1000
+    file: ./interviews.yml
   client:
     # Must be made readable by uid or gid 101
     file: ./config.json
   cert:
     file: ./nginx/example.crt
-  cert-key:
-    file: ./nginx/example.key
   nginx:
     file: ./nginx/nginx.conf
   nginx-general:
@@ -29,8 +30,13 @@ configs:
     file: ./nginx/security.conf
   nginx-site-localhost:
     file: ./nginx/sites-available/localhost.conf
-  nginx-site-localhost-8000:
-    file: ./nginx/sites-available/localhost-8000.conf
+
+secrets:
+  cert-key:
+    file: ./nginx/example.key
+  interview-encryption-key:
+    # Must be made readable by uid or gid 1000
+    file: ./example-interview-encryption-key
 
 services:
   postgres:
@@ -47,8 +53,7 @@ services:
   server:
     build:
       context: ../server
-      dockerfile: ../server/Dockerfile
-    command: ["--bind", "0.0.0.0"]
+    command: ["--bind", "0.0.0.0", "--root-path", "/api"]
     networks:
       - server
     depends_on:
@@ -59,10 +64,25 @@ services:
       - source: events
         target: /config/events.yml
 
+  interview:
+    build:
+      # It's already cloned in the js dir, no need to clone it again.
+      # Eventually this should be a hosted container.
+      context: ../js/interview/python
+    command:
+      ["--host", "0.0.0.0", "--port", "8000", "--root-path", "/api/interview"]
+    networks:
+      - server
+    configs:
+      - source: interviews
+        target: /config/interviews.yml
+    secrets:
+      - source: interview-encryption-key
+        target: /config/encryption_key
+
   client:
     build:
       context: ../js
-      dockerfile: ../js/Dockerfile
     networks:
       - client
     configs:
@@ -76,6 +96,7 @@ services:
       - server
     depends_on:
       - server
+      - interview
       - client
     ports:
       - "80:80"
@@ -84,8 +105,6 @@ services:
     configs:
       - source: cert
         target: /etc/nginx/ssl/example.crt
-      - source: cert-key
-        target: /etc/nginx/ssl/example.key
       - source: nginx
         target: /etc/nginx/nginx.conf
       - source: nginx-general
@@ -96,5 +115,6 @@ services:
         target: /etc/nginx/security.conf
       - source: nginx-site-localhost
         target: /etc/nginx/sites-enabled/localhost.conf
-      - source: nginx-site-localhost-8000
-        target: /etc/nginx/sites-enabled/localhost-8000.conf
+    secrets:
+      - source: cert-key
+        target: /etc/nginx/ssl/example.key

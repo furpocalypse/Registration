@@ -14,12 +14,10 @@ auth:
   # Origins that are allowed to access API endpoints
   allowed_origins:
     - https://localhost
-    - https://localhost:8000
 
   # Origins that are allowed to use first-party auth endpoints
   allowed_auth_origins:
     - https://localhost
-    - https://localhost:8000
 
   # The name of this service
   name: Registration
@@ -30,11 +28,12 @@ payment:
   currency: USD
 
   # Payment service configuration
-  services: {}
+  services:
+    mock: {}
 
 # Interview config
 interview:
   encryption_key: AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=
 
   # The URL of the interview service's update endpoint
-  update_url: https://localhost:8001/update
+  update_url: https://localhost/api/interview/update

@@ -120,7 +120,7 @@ async def apply_changes(
     for cart_registration in cart_data.registrations:
         registration_entity = registrations_by_id.get(cart_registration.id)
         if registration_entity:
-            await registration_entity.apply_changes_from_cart(cart_registration)
+            registration_entity.apply_changes_from_cart(cart_registration)
         else:
             # TODO: should we check if the old_data is blank?
             registration_entity = RegistrationEntity.create_from_cart(cart_registration)

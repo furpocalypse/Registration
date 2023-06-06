@@ -97,8 +97,15 @@ app.exceptions_handlers[409] = _conflict_error_handler
 app.middlewares.append(db_session_middleware)
 
 
+async def _set_base_path(request, handler):
+    """Middleware to set root_path from uvicorn."""
+    request.base_path = request.scope.get("root_path", "")
+    return await handler(request)
+
+
 @app.on_middlewares_configuration
 def _configure_forwarded_headers(app: Application):
+    app.middlewares.insert(0, _set_base_path)
     app.middlewares.insert(
         0,
         XForwardedHeadersMiddleware(
@@ -199,6 +206,7 @@ def run():
             factory=True,
             host=args.bind,
             port=args.port,
+            root_path=args.root_path,
             reload=True,
             workers=1,
         )
@@ -208,6 +216,7 @@ def run():
             factory=True,
             host=args.bind,
             port=args.port,
+            root_path=args.root_path,
         )
 
 
@@ -223,6 +232,12 @@ def parse_args() -> CommandLineConfig:
     )
     parser.add_argument(
         "-b", "--bind", type=str, help="the address to bind to", default="127.0.0.1"
+    )
+    parser.add_argument(
+        "--root-path",
+        type=str,
+        help="the URL root path",
+        default="",
     )
     parser.add_argument(
         "-d",
@@ -263,6 +278,7 @@ def parse_args() -> CommandLineConfig:
     return CommandLineConfig(
         port=args.port,
         bind=args.bind,
+        root_path=args.root_path,
         debug=args.debug,
         reload=args.reload,
         insecure=args.insecure,

@@ -11,9 +11,9 @@
 
   # Registration options
   registration_options:
-    - id: attendee
-      name: Attendee
-      description: Attendee level
+    - id: standard
+      name: Standard
+      description: Standard registration level
     - id: vip
       name: VIP
       description: VIP upgrade
@@ -32,8 +32,8 @@
 
   # Basic pricing rules
   pricing_rules:
-    - name: Attendee Registration
-      description: Attendee level registration
+    - name: Standard Registration
+      description: Standard registration level.
       price: 5000
       modifiers:
         - type_id: early-bird
@@ -41,18 +41,36 @@
           amount: -500
           when: true
       when:
-        - "'attendee' in added_option_ids"
+        - "'standard' in added_option_ids"
 
     - name: VIP Upgrade
-      description: VIP level upgrade
+      description: VIP upgrade.
       price: 2500
       when:
         - "'vip' in added_option_ids"
+
+    # To prevent incorrectly pricing a cart, every change must result in at
+    # least one line item. The server will raise an error if a change results in
+    # no line items.
+    - name: Name Change
+      description: Update registration information.
+      price: 0
+      when:
+        - registration.old_data.state == "created"
+        - or:
+            - registration.new_data.first_name != registration.old_data.first_name
+            - registration.new_data.last_name != registration.old_data.last_name
 
   # Display options
   display_options:
     # Registration display template in the self-service view.
     registration:
       title: "{{ registration.display_name }}"
-      subtitle: Attendee
-      description: ""
+      subtitle: >-
+        {% if "vip" in registration.option_ids %}
+          VIP
+        {% else %}
+          Standard
+        {% endif %}
+      description: |
+        Example registration.
