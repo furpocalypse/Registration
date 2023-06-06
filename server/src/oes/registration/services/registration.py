@@ -16,7 +16,7 @@ from oes.registration.serialization import get_converter
 from oes.registration.services.auth import AuthService
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import contains_eager
+from sqlalchemy.orm import contains_eager, selectinload
 
 
 class RegistrationService:
@@ -41,10 +41,23 @@ class RegistrationService:
             )
 
     async def get_registration(
-        self, id: UUID, *, lock: bool = False
+        self, id: UUID, *, lock: bool = False, include_accounts: bool = False
     ) -> Optional[RegistrationEntity]:
-        """Get a :class:`RegistrationEntity` by ID."""
-        return await self.db.get(RegistrationEntity, id, with_for_update=lock)
+        """Get a :class:`RegistrationEntity` by ID.
+
+        Args:
+            id: The registration ID.
+            lock: Whether to lock the row.
+            include_accounts: Include related :class:`AccountEntity` rows.
+        """
+        opts = []
+
+        if include_accounts:
+            opts.append(selectinload(RegistrationEntity.accounts))
+
+        return await self.db.get(
+            RegistrationEntity, id, with_for_update=lock, options=opts
+        )
 
     async def get_registrations(
         self, ids: Iterable[UUID], *, lock: bool = False

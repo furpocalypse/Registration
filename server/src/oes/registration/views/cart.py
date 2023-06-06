@@ -349,7 +349,7 @@ async def create_cart_add_interview_state(
 
     if registration_id.value is not None:
         registration = await _get_registration_for_change(
-            registration_id.value, registration_service
+            registration_id.value, registration_service, user
         )
     else:
         registration = None
@@ -389,11 +389,17 @@ def _validate_registration(data: dict[str, Any]) -> Registration:
 
 
 async def _get_registration_for_change(
-    id: UUID, service: RegistrationService
+    id: UUID,
+    service: RegistrationService,
+    user: User,
 ) -> RegistrationEntity:
-    # TODO: check permissions on registration
-    reg = await service.get_registration(id)
+    reg = await service.get_registration(id, include_accounts=True)
     if not reg:
+        raise NotFound
+
+    # Check that the user account is assocated with this registration
+    # TODO: check emails also
+    if user.id not in [a.id for a in reg.accounts]:
         raise NotFound
 
     return reg
