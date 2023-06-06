@@ -76,7 +76,6 @@ async def create_cart(
     event_config: EventConfig,
 ) -> Response:
     """Create a cart."""
-    # TODO: permissions
     cart_data = body.value
 
     # Check that the event exists
@@ -119,10 +118,12 @@ async def read_empty_cart(
     request: Request,
     service: CartService,
     event_config: EventConfig,
+    user: User,
 ) -> Response:
     """Get an empty cart."""
-    # TODO: permissions
     event = check_not_found(event_config.get_event(event_id.value))
+    if not event.is_visible_to(user):
+        raise NotFound
 
     cart_entity = await service.get_empty_cart(event.id)
     cart_url = get_absolute_url_to_path(request, f"/carts/{cart_entity.id}")
@@ -142,7 +143,6 @@ async def read_empty_cart(
 )
 async def read_cart(id: str, service: CartService) -> Response:
     """Read a cart."""
-    # TODO: permissions
     cart = check_not_found(await service.get_cart(id))
 
     model = cart.get_cart_data_model()
@@ -183,8 +183,6 @@ async def read_cart_pricing_result(
             line_items=[],
             total_price=0,
         )
-
-    # TODO: permissions
 
     if cart.pricing_result is None:
         event = check_not_found(event_config.get_event(model.event_id))
@@ -235,6 +233,7 @@ async def add_registration_to_cart(
     interview_service: InterviewService,
     event_config: EventConfig,
     body: FromJSON[dict[str, Any]],
+    user: User,
 ) -> Response:
     """Add a registration to a cart."""
     add_obj = _parse_add_body(body.value)
@@ -242,9 +241,8 @@ async def add_registration_to_cart(
     cart_entity = check_not_found(await service.get_cart(id))
     cart = cart_entity.get_cart_data_model()
     event = check_not_found(event_config.get_event(cart.event_id))
-
-    # TODO: permissions
-    # TODO: adding from an interview state
+    if not event.is_open_to(user):
+        raise HTTPException(409)
 
     if isinstance(add_obj, AddRegistrationDirectRequest):
         new_cart_entity = await _add_direct(cart, add_obj, service, reg_service)
@@ -290,11 +288,17 @@ async def remove_registration_from_cart(
     registration_id: UUID,
     request: Request,
     service: CartService,
+    events: EventConfig,
+    user: User,
 ) -> Response:
     """Remove a registration from a cart."""
-    # TODO: permissions
     entity = check_not_found(await service.get_cart(id))
     cart = entity.get_cart_data_model()
+
+    event = events.get_event(cart.event_id)
+    if not event or not event.is_open_to(user):
+        raise HTTPException(409)
+
     updated = cart.remove_registration(registration_id)
     if updated == cart:
         raise NotFound
@@ -338,9 +342,10 @@ async def create_cart_add_interview_state(
     """Get an interview state to add a registration to a cart."""
     entity = check_not_found(await service.get_cart(id))
     cart = entity.get_cart_data_model()
-    # TODO: permissions
+
     event = check_not_found(event_config.get_event(cart.event_id))
-    # TODO: event visibility
+    if not event.is_open_to(user):
+        raise HTTPException(409)
 
     if registration_id.value is not None:
         registration = await _get_registration_for_change(

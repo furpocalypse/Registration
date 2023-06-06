@@ -19,6 +19,7 @@ from oes.registration.auth import RequireCart
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState
+from oes.registration.models.auth import User
 from oes.registration.models.cart import CartData
 from oes.registration.models.event import EventConfig
 from oes.registration.models.payment import PaymentServiceCheckout
@@ -58,14 +59,15 @@ async def list_available_checkout_methods(
     cart_service: CartService,
     checkout_service: CheckoutService,
     event_config: EventConfig,
+    user: User,
 ) -> list[CheckoutMethod]:
     """List checkout methods."""
     cart_entity = check_not_found(await cart_service.get_cart(cart_id))
     cart_data = cart_entity.get_cart_data_model()
 
     event = check_not_found(event_config.get_event(cart_data.event_id))
-
-    # TODO: permissions/check event open/visible?
+    if not event.is_open_to(user):
+        raise HTTPException(409)
 
     # Price cart if unpriced, and ignore empty carts
 
@@ -111,20 +113,19 @@ async def create_checkout(
     registration_service: RegistrationService,
     event_config: EventConfig,
     db: AsyncSession,
+    user: User,
     _body: Optional[FromBytes],
 ) -> Response:
     """Create a checkout for a cart."""
     cart_entity = check_not_found(await cart_service.get_cart(cart_id))
     cart = cart_entity.get_cart_data_model()
 
-    # TODO: permissions
-
     if not checkout_service.is_service_available(service.value):
         raise NotFound
 
     event = check_not_found(event_config.get_event(cart.event_id))
-
-    # TODO: check event open/visible
+    if not event.is_open_to(user):
+        raise HTTPException(409)
 
     # make sure the changes can still be applied
     error_response = await _validate_changes_apply(
@@ -177,7 +178,7 @@ async def create_checkout(
 @transaction
 async def cancel_checkout(id: UUID, checkout_service: CheckoutService) -> Response:
     """Cancel a checkout."""
-    # TODO: permissions
+    # don't check event, permit checkout cancel even if event is missing/closed
     result = await checkout_service.cancel_checkout(id)
     if result is None:
         raise NotFound
@@ -205,7 +206,9 @@ async def update_checkout(
     registration_service: RegistrationService,
     auth_service: AuthService,
     event_service: EventService,
+    events: EventConfig,
     db: AsyncSession,
+    user: User,
 ) -> Response:
     """Update a checkout."""
     checkout = check_not_found(await checkout_service.get_checkout(id, lock=True))
@@ -213,15 +216,14 @@ async def update_checkout(
     payment_service = checkout.service
     external_id = checkout.external_id
 
-    if not checkout.is_open:
-        raise NotFound
+    cart_data = checkout.cart_data
 
-    # TODO: permissions
+    _validate_checkout_and_event(checkout, cart_data, events, user)
 
     # lock rows and verify changes can be applied before completing the transaction
     if not checkout.changes_applied:
         error_response = await _validate_changes_apply(
-            checkout.get_cart_data(), registration_service, lock=True
+            cart_data, registration_service, lock=True
         )
         if error_response:
             await db.rollback()
@@ -250,6 +252,20 @@ async def update_checkout(
             f"after updating the checkout. This may need to be resolved manually."
         )
         raise
+
+
+def _validate_checkout_and_event(
+    checkout: CheckoutEntity,
+    cart_data: CartData,
+    events: EventConfig,
+    user: User,
+):
+    if not checkout.is_open:
+        raise NotFound
+
+    event = events.get_event(cart_data.event_id)
+    if not event or not event.is_open_to(user):
+        raise HTTPException(409)
 
 
 async def _handle_update(
