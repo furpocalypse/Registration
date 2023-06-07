@@ -14,7 +14,7 @@ export const SigninDialogManager = observer(() => {
     <SigninDialog
       opened={opened}
       enabledOptions={{
-        email: true,
+        email: false,
         guest: true,
       }}
       onSelect={async (type) => {
