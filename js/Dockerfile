@@ -7,8 +7,6 @@ RUN npm ci
 RUN cd interview/js && npm run -ws build
 COPY .babelrc.json webpack.config.cjs ./
 COPY src/ src/
-# TODO: get from args?
-COPY config.json ./
 RUN npm run build
 
 
