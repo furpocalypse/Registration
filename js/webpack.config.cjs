@@ -43,7 +43,10 @@ module.exports = (env, argv) => {
         ],
 
         // config.json
-        "config.json$": path.resolve("./config.json"),
+        "config.json$": [
+          path.resolve("./config.json"),
+          path.resolve("./config.example.json"),
+        ],
       },
     },
     plugins: [
