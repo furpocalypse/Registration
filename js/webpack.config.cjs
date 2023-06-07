@@ -26,7 +26,7 @@ module.exports = (env, argv) => {
 
         // config.json
         {
-          test: /config\.json$/,
+          test: /config(\.example)?\.json$/,
           type: "asset/resource",
           generator: {
             filename: "config.json",
