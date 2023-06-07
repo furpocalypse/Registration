@@ -11,6 +11,7 @@ containers, their permissions in the host filesystem need to be set appropriatel
 
 - `config.yml`, `events.yml` - readable by UID or GID 1000
 - `config.json` - readable by UID or GID 101
+- `example-interview-encryption-key` - readable by UID or GID 1000
 
 Start the service with `docker compose up`. This will build the container images and
 create the containers. You can view the example at
