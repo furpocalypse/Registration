@@ -6,4 +6,5 @@
 !extra
 !webpack.config.cjs
 !.babelrc.json
+!config.example.json
 !config.json
