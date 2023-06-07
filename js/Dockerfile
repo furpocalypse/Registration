@@ -5,7 +5,7 @@ COPY interview/ interview/
 COPY package.json package-lock.json ./
 RUN npm ci
 RUN cd interview/js && npm run -ws build
-COPY .babelrc.json webpack.config.cjs ./
+COPY .babelrc.json webpack.config.cjs config.example.json ./
 COPY src/ src/
 RUN npm run build
 
