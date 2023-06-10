@@ -1,10 +1,37 @@
 """Hook models."""
+from __future__ import annotations
+
 from collections.abc import Generator, Mapping, Sequence
 from enum import Enum
-from typing import Union
+from typing import Any, Union
 
 from attrs import Factory, field, frozen
-from oes.hook import ExecutableHookConfig, PythonHookConfig
+from oes.hook import (
+    ExecutableHookConfig,
+    Hook,
+    HttpHookConfig,
+    PythonHookConfig,
+    executable_hook_factory,
+    http_hook_factory,
+    python_hook_factory,
+)
+from oes.registration.http_client import get_http_client
+from typing_extensions import assert_never
+
+RETRY_SECONDS = (
+    5,
+    30,
+    60,
+    600,
+    3600,
+    7200,
+    43200,
+    86400,
+)
+"""How many seconds between each retry."""
+
+NUM_RETRIES = len(RETRY_SECONDS)
+"""Number of attempts to re-send a hook."""
 
 
 class HookEvent(str, Enum):
@@ -48,6 +75,16 @@ HookConfigObject = Union[
 """Hook configuration types."""
 
 
+async def _http_func(body: Any, config: HttpHookConfig) -> Any:
+    client = get_http_client()
+    response = await client.post(config.url, json=body)
+    response.raise_for_status()
+    if response.status_code == 204:
+        return None
+    else:
+        return response.json()
+
+
 @frozen
 class HookConfigEntry:
     """Hook configuration entry."""
@@ -60,6 +97,22 @@ class HookConfigEntry:
 
     retry: bool = True
     """Whether to retry the hook if it fails."""
+
+    def get_hook(self) -> Hook:
+        """Get the configured :class:`Hook`."""
+        if isinstance(self.hook, URLOnlyHTTPHookConfig):
+            return http_hook_factory(
+                HttpHookConfig(
+                    self.hook.url,
+                    _http_func,
+                )
+            )
+        elif isinstance(self.hook, ExecutableHookConfig):
+            return executable_hook_factory(self.hook)
+        elif isinstance(self.hook, PythonHookConfig):
+            return python_hook_factory(self.hook)
+        else:
+            assert_never(self.hook)
 
 
 @frozen

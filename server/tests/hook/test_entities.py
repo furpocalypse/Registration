@@ -1,10 +1,11 @@
 from datetime import datetime, timedelta
 from unittest.mock import patch
 
-from oes.registration.entities.hook import NUM_RETRIES, RETRY_SECONDS, HookLogEntity
+from oes.registration.hook.entities import HookLogEntity
+from oes.registration.hook.models import NUM_RETRIES, RETRY_SECONDS
 
 
-@patch("oes.registration.entities.hook.get_now")
+@patch("oes.registration.hook.entities.get_now")
 def test_hook_update_attempts(get_now_mock):
     now = datetime(2020, 1, 1)
     hook = HookLogEntity(attempts=0)

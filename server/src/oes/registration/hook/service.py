@@ -1,0 +1,164 @@
+"""Hook service module."""
+import asyncio
+import contextlib
+from asyncio import CancelledError, Task, get_running_loop
+from datetime import datetime
+from inspect import iscoroutinefunction
+from typing import Any, Iterable, Optional
+from uuid import UUID
+
+from loguru import logger
+from oes.registration.database import DBConfig
+from oes.registration.hook.entities import HookLogEntity
+from oes.registration.hook.models import HookConfigEntry
+from oes.registration.util import get_now
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+
+
+class HookRetryService:
+    """Service that manages retrying failed hooks."""
+
+    _tasks: set[Task]
+
+    def __init__(self, db_config: DBConfig):
+        self._db_config = db_config
+        self._tasks = set()
+
+    async def _wait_and_retry(self, id: UUID, retry: datetime):
+        now = get_now()
+        while now < retry:
+            diff = (retry - now).total_seconds()
+            await asyncio.sleep(diff)
+            now = get_now()
+
+        await attempt_invoke_hooks([id], self, self._db_config.session_factory)
+
+    def retry_hook_at(self, id: UUID, retry: datetime):
+        """Retry the given hook ID at a later time."""
+        loop = asyncio.get_running_loop()
+        task = loop.create_task(self._wait_and_retry(id, retry))
+        task.add_done_callback(lambda t: self._tasks.remove(t))
+        self._tasks.add(task)
+
+    async def close(self):
+        """Cancel all tasks."""
+        tasks = list(self._tasks)
+        for task in tasks:
+            task.cancel()
+            with contextlib.suppress(CancelledError):
+                await task
+
+
+class HookService:
+    """Service that manages creating/invoking hooks."""
+
+    def __init__(self, retry_service: HookRetryService, db: AsyncSession):
+        # TODO: check executable/python hooks against config
+        self.retry_service = retry_service
+        self.db = db
+
+    async def get_hook_entity(self, id: UUID) -> Optional[HookLogEntity]:
+        """Get a :class:`HookLogEntity` by ID."""
+        res = await self.db.get(HookLogEntity, id, with_for_update=True)
+        return res
+
+    async def create(self, hook_config: HookConfigEntry, body: dict[str, Any]) -> UUID:
+        """Create a hook entity.
+
+        Returns:
+            The created hook ID.
+        """
+        entity = HookLogEntity.create(hook_config, body)
+        self.db.add(entity)
+        await self.db.flush()
+        return entity.id
+
+
+async def attempt_invoke_hooks(
+    ids: Iterable[UUID],
+    retry_service: HookRetryService,
+    db_factory: async_sessionmaker,
+):
+    """Attempt to invoke the hooks with the given IDs.
+
+    Silently skips hooks that do not exist or are not retryable.
+
+    Schedules the hooks to be retried if an exception occurs.
+
+    Args:
+        ids: The hook IDs.
+        retry_service: The :class:`HookRetryService`.
+        db_factory: The DB session factory.
+    """
+    session = db_factory()
+    try:
+        service = HookService(retry_service, session)
+
+        for id_ in ids:
+            entity = await service.get_hook_entity(id_)
+            if entity and entity.get_is_retryable():
+                try:
+                    await attempt_invoke_hook_entity(entity, retry_service)
+                except Exception:
+                    # ignore exceptions
+                    await session.commit()
+                else:
+                    await session.delete(entity)
+                    await session.commit()
+    finally:
+        await session.close()
+
+
+async def attempt_invoke_hook_entity(
+    entity: HookLogEntity,
+    retry_service: HookRetryService,
+) -> Any:
+    """Attempt to invoke the hook described by a :class:`HookLogEntity`.
+
+    If an exception occurs, the entity will be scheduled to be retried and the
+    exception will be re-raised.
+
+    Args:
+        entity: The :class:`HookLogEntity`.
+        retry_service: The :class:`HookRetryService`.
+    """
+    try:
+        result = await invoke_hook_entity(entity)
+    except Exception:
+        retry_at = entity.update_attempts()
+        if retry_at is not None:
+            retry_service.retry_hook_at(entity.id, retry_at)
+            retry_msg = f"Will retry at {retry_at}"
+        else:
+            retry_msg = "Will not retry"
+
+        logger.opt(exception=True).error(f"Hook {entity} failed. {retry_msg}.")
+        raise
+    else:
+        logger.debug(f"Called hook {entity}")
+        return result
+
+
+async def invoke_hook_entity(entity: HookLogEntity) -> Any:
+    """Invoke the hook described by a :class:`HookLogEntity`."""
+    hook_config = entity.get_config_entry()
+    body = entity.body
+    return await invoke_hook(hook_config, body)
+
+
+async def invoke_hook(hook_config: HookConfigEntry, body: dict[str, Any]) -> Any:
+    """Invoke a hook with the given body.
+
+    Args:
+        hook_config: The :class:`HookConfigEntry` representing the hook to invoke.
+        body: The body.
+
+    Returns:
+        The returned body.
+    """
+    hook = hook_config.get_hook()
+    if iscoroutinefunction(hook):
+        return await hook(body)
+    else:
+        loop = get_running_loop()
+        return await loop.run_in_executor(None, hook, body)

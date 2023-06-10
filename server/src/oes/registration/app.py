@@ -25,6 +25,7 @@ from oes.registration.database import (
     db_session_middleware,
 )
 from oes.registration.docs import docs
+from oes.registration.hook.service import HookRetryService
 from oes.registration.http_client import setup_http_client, shutdown_http_client
 from oes.registration.log import setup_logging
 from oes.registration.models.config import Config
@@ -36,7 +37,6 @@ from oes.registration.services.auth import AuthService
 from oes.registration.services.cart import CartService
 from oes.registration.services.checkout import CheckoutService
 from oes.registration.services.event import EventService
-from oes.registration.services.hook import HookRetryService
 from oes.registration.services.interview import InterviewService
 from oes.registration.services.registration import RegistrationService
 from oes.registration.views.responses import BodyValidationError, ExceptionDetails
