@@ -87,6 +87,8 @@ class HookRetryService:
 
 
 class HookService:
+    """Hook service."""
+
     def __init__(self, retry_service: HookRetryService, db: AsyncSession):
         # TODO: check executable/python hooks against config
         self.retry_service = retry_service

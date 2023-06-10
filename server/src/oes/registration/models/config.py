@@ -1,8 +1,9 @@
 """Config models."""
 from collections.abc import Sequence
-from typing import Any, NewType, Optional
+from typing import Any, NewType, Optional, Union
 
 from attrs import field, frozen, validators
+from oes.hook import ExecutableHookConfig, HttpHookConfig, PythonHookConfig
 
 
 @frozen
@@ -59,6 +60,24 @@ class InterviewConfig:
 
     update_url: str
     """The URL of the interview service's update endpoint."""
+
+
+HookConfig = Union[
+    HttpHookConfig,
+    ExecutableHookConfig,
+    PythonHookConfig,
+]
+"""Hook configuration types."""
+
+
+class HookConfigEntry:
+    """Hook configuration."""
+
+    hook: HookConfig
+    """The hook configuration."""
+
+    retry: bool = True
+    """Whether to retry the hook if it fails."""
 
 
 @frozen
