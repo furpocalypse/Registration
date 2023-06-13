@@ -38,7 +38,7 @@ class RegistrationService:
         if registration.state == RegistrationState.created:
             await self.hook_sender.schedule_hooks_for_event(
                 HookEvent.registration_created,
-                get_converter().unstructure(registration.get_model()),
+                registration.get_model(),
             )
             audit_log.bind(type=AuditLogType.registration_create).success(
                 "Registration {registration} created", registration=registration

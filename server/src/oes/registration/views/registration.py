@@ -22,6 +22,7 @@ from oes.registration.models.event import EventConfig
 from oes.registration.models.registration import (
     Registration,
     RegistrationState,
+    RegistrationUpdatedEvent,
     WritableRegistration,
 )
 from oes.registration.serialization import get_converter
@@ -168,6 +169,7 @@ async def update_registration(
     request: Request,
     id: UUID,
     service: RegistrationService,
+    hook_sender: HookSender,
     _body: AttrsBody[CreateRegistrationRequest],
 ) -> Response:
     """Update a registration."""
@@ -179,7 +181,17 @@ async def update_registration(
     # should already be loaded
     body_json = await request.json(loads=json_loads)
     writable = get_converter().structure(body_json, WritableRegistration)
+    old_data = reg.get_model()
     reg.update_properties_from_model(writable)
+    new_data = reg.get_model()
+
+    await hook_sender.schedule_hooks_for_event(
+        HookEvent.registration_updated,
+        RegistrationUpdatedEvent(
+            old_data=old_data,
+            new_data=new_data,
+        ),
+    )
 
     audit_log.bind(type=AuditLogType.registration_update).success(
         "Registration {registration} updated", registration=reg
@@ -212,7 +224,7 @@ async def complete_registration(
 
     try:
         reg.complete() and await hook_sender.schedule_hooks_for_event(
-            HookEvent.registration_created, get_converter().unstructure(reg.get_model())
+            HookEvent.registration_created, reg.get_model()
         )
     except ValueError as e:
         raise HTTPException(409, str(e))
@@ -245,7 +257,7 @@ async def cancel_registration(
     try:
         reg.cancel() and await hook_sender.schedule_hooks_for_event(
             HookEvent.registration_canceled,
-            get_converter().unstructure(reg.get_model()),
+            reg.get_model(),
         )
     except ValueError as e:
         raise HTTPException(409, str(e))

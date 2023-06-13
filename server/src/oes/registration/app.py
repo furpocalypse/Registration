@@ -174,7 +174,7 @@ async def _setup_app(config: Config, app: Application):
 
     app.services.add_singleton_by_factory(_commit_callback_service_factory)
     app.services.add_singleton_by_factory(_hook_retry_service_factory)
-    app.services.add_singleton_by_factory(_hook_sender_factory)
+    app.services.add_scoped_by_factory(_hook_sender_factory)
 
     # TODO: remove
     await db_config.create_tables()

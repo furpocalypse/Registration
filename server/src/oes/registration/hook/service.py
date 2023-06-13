@@ -14,6 +14,7 @@ import sqlalchemy.event
 from loguru import logger
 from oes.registration.hook.entities import HookLogEntity
 from oes.registration.hook.models import HookConfig, HookConfigEntry, HookEvent
+from oes.registration.serialization import get_converter
 from oes.registration.util import get_now
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
@@ -213,7 +214,7 @@ class HookSender:
     async def schedule_hooks_for_event(
         self,
         hook_event: HookEvent,
-        body: dict[str, Any],
+        body: Any,
     ):
         """Invoke hooks for the given event after the transaction commits.
 
@@ -221,9 +222,13 @@ class HookSender:
             hook_event: The event.
             body: The hook body.
         """
+        body_dict = (
+            body if isinstance(body, dict) else get_converter().unstructure(body)
+        )
+
         for hook_config in self.config.get_by_event(hook_event):
             if hook_config.retry:
-                hook_id = await self.service.create(hook_config, body)
+                hook_id = await self.service.create(hook_config, body_dict)
                 self.callback_service.add_callback(
                     self.db,
                     attempt_invoke_hooks,
@@ -234,7 +239,7 @@ class HookSender:
                 )
             else:
                 self.callback_service.add_callback(
-                    self.db, invoke_hook, hook_config, body
+                    self.db, invoke_hook, hook_config, body_dict
                 )
 
 
