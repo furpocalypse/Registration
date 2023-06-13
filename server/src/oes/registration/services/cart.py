@@ -4,6 +4,7 @@ from uuid import UUID
 
 from oes.registration.entities.cart import CartEntity
 from oes.registration.entities.registration import RegistrationEntity
+from oes.registration.hook.service import HookSender
 from oes.registration.models.cart import CartData, CartRegistration
 from oes.registration.models.event import Event
 from oes.registration.models.pricing import PricingRequest, PricingResult
@@ -95,6 +96,7 @@ async def apply_changes(
     registration_service: RegistrationService,
     auth_service: AuthService,
     cart_data: CartData,
+    hook_sender: HookSender,
 ) -> list[RegistrationEntity]:
     """Apply all registration changes in a checkout.
 
@@ -102,6 +104,7 @@ async def apply_changes(
         registration_service: The :class:`RegistrationService`.
         auth_service: The :class:`AuthService`.
         cart_data: The :class:`CartData` to apply.
+        hook_sender: A :class:`HookSender` instance.
 
     Returns:
         A list of the created/updated registrations.
@@ -120,7 +123,9 @@ async def apply_changes(
     for cart_registration in cart_data.registrations:
         registration_entity = registrations_by_id.get(cart_registration.id)
         if registration_entity:
-            registration_entity.apply_changes_from_cart(cart_registration)
+            await registration_entity.apply_changes_from_cart(
+                cart_registration, hook_sender
+            )
         else:
             # TODO: should we check if the old_data is blank?
             registration_entity = RegistrationEntity.create_from_cart(cart_registration)

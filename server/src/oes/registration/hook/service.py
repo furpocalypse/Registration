@@ -1,129 +1,177 @@
 """Hook service module."""
 import asyncio
 import contextlib
-from asyncio import BaseEventLoop, CancelledError, Task, get_running_loop
+from asyncio import AbstractEventLoop, CancelledError, Task, get_running_loop
+from collections.abc import Awaitable, Callable
+from concurrent.futures import Future
 from datetime import datetime
+from functools import partial, wraps
 from inspect import iscoroutinefunction
-from typing import Any, Iterable, Optional, Union
+from typing import Any, Iterable, Optional, TypeVar
 from uuid import UUID
 
 import sqlalchemy.event
 from loguru import logger
-from oes.registration.database import DBConfig
 from oes.registration.hook.entities import HookLogEntity
 from oes.registration.hook.models import HookConfig, HookConfigEntry, HookEvent
 from oes.registration.util import get_now
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from sqlalchemy.orm import Session
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R", covariant=True)
+
+
+class CommitCallbackService:
+    """Run callbacks when a DB session commits."""
+
+    # this might be useful enough to move into its own module
+
+    _callbacks: dict[int, list[Callable[[], Awaitable[None]]]]
+
+    def __init__(self, loop: AbstractEventLoop):
+        self._loop = loop
+        self._callbacks = {}
+
+    def _on_commit(self, session: Session) -> Future:
+        obj_id = id(session)
+        return asyncio.run_coroutine_threadsafe(
+            self._execute_callbacks(obj_id), self._loop
+        )
+
+    def _on_rollback(self, session: Session) -> Future:
+        obj_id = id(session)
+        return asyncio.run_coroutine_threadsafe(
+            self._discard_callbacks(obj_id), self._loop
+        )
+
+    def add_listeners(self, event_target: async_sessionmaker):
+        underlying = event_target.class_.sync_session_class
+        sqlalchemy.event.listen(underlying, "after_commit", self._on_commit)
+        sqlalchemy.event.listen(underlying, "after_rollback", self._on_rollback)
+
+    def remove_listeners(self, event_target: async_sessionmaker):
+        underlying = event_target.class_.sync_session_class
+        sqlalchemy.event.remove(underlying, "after_rollback", self._on_rollback)
+        sqlalchemy.event.remove(underlying, "after_commit", self._on_commit)
+
+    def add_callback(
+        self,
+        session: AsyncSession,
+        func: Callable[P, R],
+        *args: P.args,
+        **kwargs: P.kwargs,
+    ):
+        """Add a function to call when the session commits.
+
+        Warning:
+            This is not thread-safe and must be called from within the event loop.
+        """
+        obj_id = id(session.sync_session)
+        bound = partial(func, *args, **kwargs)
+        list_ = self._callbacks.setdefault(obj_id, [])
+        list_.append(bound)  # type: ignore
+
+    async def _execute_callbacks(self, obj_id: int):
+        callbacks = self._callbacks.pop(obj_id, [])
+        if not callbacks:
+            return
+
+        tasks = [_suppress_exceptions(cb)() for cb in callbacks]
+        await asyncio.gather(*tasks)
+
+    async def _discard_callbacks(self, obj_id: int):
+        self._callbacks.pop(obj_id, None)
+
+
+def _suppress_exceptions(
+    func: Callable[P, Awaitable[None]]
+) -> Callable[P, Awaitable[None]]:
+    @wraps(func)
+    async def wrapped(*args: P.args, **kwargs: P.kwargs):
+        try:
+            await func(*args, **kwargs)
+        except Exception:
+            logger.opt(exception=True).error(
+                "Unhandled exception in post-commit callback"
+            )
+
+    return wrapped
 
 
 class HookRetryService:
-    """Service that manages retrying failed hooks."""
+    """Service that manages scheduling retries of hooks."""
 
     _tasks: set[Task]
-    _post_commit_hooks: dict[
-        int, list[Union[UUID, tuple[HookConfigEntry, dict[str, Any]]]]
-    ]
 
-    def __init__(self, loop: BaseEventLoop, db_config: DBConfig):
-        self._loop = loop
-        self._db_config = db_config
-        self._tasks = set()
-        self._post_commit_hooks = {}
-        sqlalchemy.event.listen(
-            self._db_config.session_factory, "after_commit", self._handle_post_commit
-        )
-        sqlalchemy.event.listen(
-            self._db_config.session_factory,
-            "after_rollback",
-            self._handle_post_rollback,
-        )
-
-    def _handle_post_commit(self, session: AsyncSession):
-        """Schedule invocation of all hooks associated with the committed session."""
-        hooks = self._post_commit_hooks.pop(id(session), [])
-        entity_ids = [h for h in hooks if isinstance(h, UUID)]
-        hook_objs = [h for h in hooks if isinstance(h, tuple)]
-
-        # messy
-
-        if entity_ids:
-            task = self._loop.create_task(
-                attempt_invoke_hooks(entity_ids, self, self._db_config.session_factory)
-            )
-            task.add_done_callback(lambda t: self._tasks.remove(t))
-            self._tasks.add(task)
-
-        for hook_config, body in hook_objs:
-
-            async def _run():
-                try:
-                    await invoke_hook(hook_config, body)
-                except Exception:
-                    logger.opt(exception=True).error(
-                        f"Hook {hook_config} failed. Will not retry."
-                    )
-
-            task = self._loop.create_task(_run())
-            task.add_done_callback(lambda t: self._tasks.remove(t))
-            self._tasks.add(task)
-
-    def _handle_post_rollback(self, session: AsyncSession):
-        """Discard all scheduled hooks if a session rollbacks."""
-        self._post_commit_hooks.pop(id(session))
-
-    def invoke_hook_after_commit(
+    def __init__(
         self,
-        id_or_config: Union[UUID, tuple[HookConfigEntry, dict[str, Any]]],
-        session: AsyncSession,
+        loop: AbstractEventLoop,
+        config: HookConfig,
+        session_factory: async_sessionmaker,
     ):
-        """Schedule a hook to be invoked after the given session commits.
+        self._loop = loop
+        self.config = config
+        self._tasks = set()
+        self._session_factory = session_factory
+
+    def retry_hook_id_at(self, t: datetime, id: UUID) -> Task:
+        """Attempt to retry the hook ID at a later time.
+
+        Warning:
+            This method is not thread-safe and should only be called from the event
+            loop.
 
         Args:
-            id_or_config: A hook entity ID or a tuple of a config and body.
-            session: The DB session.
+            t: When to retry the hook.
+            id: The hook ID.
         """
-        list_ = self._post_commit_hooks.setdefault(id(session), [])
-        list_.append(id_or_config)
-
-    async def _wait_and_retry(self, id: UUID, retry: datetime):
-        now = get_now()
-        while now < retry:
-            diff = (retry - now).total_seconds()
-            await asyncio.sleep(diff)
-            now = get_now()
-
-        await attempt_invoke_hooks([id], self, self._db_config.session_factory)
-
-    def retry_hook_at(self, id: UUID, retry: datetime):
-        """Retry the given hook ID at a later time."""
-        loop = asyncio.get_running_loop()
-        task = loop.create_task(self._wait_and_retry(id, retry))
+        coro = _call_at(
+            t,
+            attempt_invoke_hooks,
+            [id],
+            self,
+            self._session_factory,
+            self.config,
+        )
+        task = self._loop.create_task(coro)
         task.add_done_callback(lambda t: self._tasks.remove(t))
         self._tasks.add(task)
+        return task
 
     async def close(self):
         """Cancel all tasks."""
-        sqlalchemy.event.remove(
-            self._db_config.session_factory,
-            "after_rollback",
-            self._handle_post_rollback,
-        )
-        sqlalchemy.event.remove(
-            self._db_config.session_factory, "after_commit", self._handle_post_commit
-        )
         tasks = list(self._tasks)
         for task in tasks:
             task.cancel()
+
+        for task in tasks:
             with contextlib.suppress(CancelledError):
                 await task
 
 
-class HookService:
-    """Service that manages creating/invoking hooks."""
+async def _call_at(
+    t: datetime, func: Callable[P, Awaitable[None]], *args: P.args, **kwargs: P.kwargs
+) -> None:
+    """Wait until the given time and then call the function."""
+    await _wait_until(t)
+    await func(*args, **kwargs)
 
-    def __init__(self, retry_service: HookRetryService, db: AsyncSession):
-        # TODO: check executable/python hooks against config
-        self.retry_service = retry_service
+
+async def _wait_until(t: datetime):
+    """Wait until the given time."""
+    now = get_now()
+    while now < t:
+        diff = (t - now).total_seconds()
+        await asyncio.sleep(diff)
+        now = get_now()
+
+
+class HookService:
+    """Service that manages creating/retrieving hooks."""
+
+    def __init__(self, db: AsyncSession):
         self.db = db
 
     async def get_hook_entity(self, id: UUID) -> Optional[HookLogEntity]:
@@ -143,34 +191,58 @@ class HookService:
         return entity.id
 
 
-async def schedule_hooks_for_event(
-    service: HookService,
-    config: HookConfig,
-    hook_event: HookEvent,
-    body: dict[str, Any],
-):
-    """Schedule hooks for the given event to be called after the transaction commits.
+class HookSender:
+    """Utility class for invoking hooks for an event."""
 
-    Args:
-        service: The :class:`HookService`.
-        config: The :class:`HookConfig`.
-        hook_event: The event.
-        body: The hook body.
-    """
-    for hook_config in config.get_by_event(hook_event):
-        if hook_config.retry:
-            id_ = await service.create(hook_config, body)
-            service.retry_service.invoke_hook_after_commit(id_, service.db)
-        else:
-            service.retry_service.invoke_hook_after_commit(
-                (hook_config, body), service.db
-            )
+    def __init__(
+        self,
+        config: HookConfig,
+        db_factory: async_sessionmaker,
+        db: AsyncSession,
+        service: HookService,
+        retry_service: HookRetryService,
+        callback_service: CommitCallbackService,
+    ):
+        self.config = config
+        self.db_factory = db_factory
+        self.db = db
+        self.service = service
+        self.retry_service = retry_service
+        self.callback_service = callback_service
+
+    async def schedule_hooks_for_event(
+        self,
+        hook_event: HookEvent,
+        body: dict[str, Any],
+    ):
+        """Invoke hooks for the given event after the transaction commits.
+
+        Args:
+            hook_event: The event.
+            body: The hook body.
+        """
+        for hook_config in self.config.get_by_event(hook_event):
+            if hook_config.retry:
+                hook_id = await self.service.create(hook_config, body)
+                self.callback_service.add_callback(
+                    self.db,
+                    attempt_invoke_hooks,
+                    [hook_id],
+                    self.retry_service,
+                    self.db_factory,
+                    self.config,
+                )
+            else:
+                self.callback_service.add_callback(
+                    self.db, invoke_hook, hook_config, body
+                )
 
 
 async def attempt_invoke_hooks(
     ids: Iterable[UUID],
     retry_service: HookRetryService,
     db_factory: async_sessionmaker,
+    hook_config: HookConfig,
 ):
     """Attempt to invoke the hooks with the given IDs.
 
@@ -182,29 +254,43 @@ async def attempt_invoke_hooks(
         ids: The hook IDs.
         retry_service: The :class:`HookRetryService`.
         db_factory: The DB session factory.
+        hook_config: The hook configuration.
     """
     session = db_factory()
     try:
-        service = HookService(retry_service, session)
+        service = HookService(session)
 
         for id_ in ids:
             entity = await service.get_hook_entity(id_)
             if entity and entity.get_is_retryable():
-                try:
-                    await attempt_invoke_hook_entity(entity, retry_service)
-                except Exception:
-                    # ignore exceptions
-                    await session.commit()
-                else:
-                    await session.delete(entity)
-                    await session.commit()
+                await _attempt_invoke_hook_entity_and_commit(
+                    entity, session, retry_service, hook_config
+                )
     finally:
         await session.close()
+
+
+async def _attempt_invoke_hook_entity_and_commit(
+    entity: HookLogEntity,
+    session: AsyncSession,
+    retry_service: HookRetryService,
+    config: HookConfig,
+) -> Any:
+    """Attempt to send the hook and remove it."""
+    try:
+        await attempt_invoke_hook_entity(entity, retry_service, config)
+    except Exception:
+        # ignore errors, they were already handled
+        await session.commit()
+    else:
+        await session.delete(entity)
+        await session.commit()
 
 
 async def attempt_invoke_hook_entity(
     entity: HookLogEntity,
     retry_service: HookRetryService,
+    config: HookConfig,
 ) -> Any:
     """Attempt to invoke the hook described by a :class:`HookLogEntity`.
 
@@ -214,13 +300,14 @@ async def attempt_invoke_hook_entity(
     Args:
         entity: The :class:`HookLogEntity`.
         retry_service: The :class:`HookRetryService`.
+        config: The :class:`HookConfig`.
     """
     try:
-        result = await invoke_hook_entity(entity)
+        result = await invoke_hook_entity(entity, config)
     except Exception:
         retry_at = entity.update_attempts()
         if retry_at is not None:
-            retry_service.retry_hook_at(entity.id, retry_at)
+            retry_service.retry_hook_id_at(retry_at, entity.id)
             retry_msg = f"Will retry at {retry_at}"
         else:
             retry_msg = "Will not retry"
@@ -232,9 +319,15 @@ async def attempt_invoke_hook_entity(
         return result
 
 
-async def invoke_hook_entity(entity: HookLogEntity) -> Any:
+async def invoke_hook_entity(entity: HookLogEntity, config: HookConfig) -> Any:
     """Invoke the hook described by a :class:`HookLogEntity`."""
     hook_config = entity.get_config_entry()
+
+    # verify that hooks retrieved from the db exist in the config (do not allow
+    # running arbitrary code from a db column)
+    if not config.hook_config_exists(hook_config.on, hook_config.hook):
+        raise ValueError(f"Hook does not exist in config: {hook_config}")
+
     body = entity.body
     return await invoke_hook(hook_config, body)
 

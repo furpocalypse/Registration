@@ -15,6 +15,8 @@ from oes.registration.auth import RequireAdmin
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.registration import RegistrationEntity
+from oes.registration.hook.models import HookEvent
+from oes.registration.hook.service import HookSender
 from oes.registration.log import AuditLogType, audit_log
 from oes.registration.models.event import EventConfig
 from oes.registration.models.registration import (
@@ -201,6 +203,7 @@ async def update_registration(
 async def complete_registration(
     id: UUID,
     service: RegistrationService,
+    hook_sender: HookSender,
 ) -> Response:
     """Complete a pending registration."""
     reg = check_not_found(await service.get_registration(id, lock=True))
@@ -208,7 +211,9 @@ async def complete_registration(
     # TODO: permissions
 
     try:
-        reg.complete()
+        reg.complete() and await hook_sender.schedule_hooks_for_event(
+            HookEvent.registration_created, get_converter().unstructure(reg.get_model())
+        )
     except ValueError as e:
         raise HTTPException(409, str(e))
 
@@ -230,6 +235,7 @@ async def complete_registration(
 async def cancel_registration(
     id: UUID,
     service: RegistrationService,
+    hook_sender: HookSender,
 ) -> Response:
     """Cancel a pending registration."""
     reg = check_not_found(await service.get_registration(id, lock=True))
@@ -237,7 +243,10 @@ async def cancel_registration(
     # TODO: permissions
 
     try:
-        reg.cancel()
+        reg.cancel() and await hook_sender.schedule_hooks_for_event(
+            HookEvent.registration_canceled,
+            get_converter().unstructure(reg.get_model()),
+        )
     except ValueError as e:
         raise HTTPException(409, str(e))
 

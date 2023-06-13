@@ -54,7 +54,7 @@ class HookLogEntity(Base):
     def get_is_retryable(self, *, now: Optional[datetime] = None) -> bool:
         """Get whether this hook is eligible for retry."""
         now = now if now is not None else get_now()
-        return self.retry_at is not None and self.retry_at <= now
+        return self.attempts == 0 or self.retry_at is not None and self.retry_at <= now
 
     def update_attempts(self) -> Optional[datetime]:
         """Update the number of attempts and set the next retry time."""

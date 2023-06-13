@@ -6,7 +6,10 @@ from uuid import UUID
 from oes.registration.entities.auth import AccountEntity
 from oes.registration.entities.event_stats import EventStatsEntity
 from oes.registration.entities.registration import RegistrationEntity
+from oes.registration.hook.models import HookEvent
+from oes.registration.hook.service import HookSender
 from oes.registration.log import AuditLogType, audit_log
+from oes.registration.models.config import Config
 from oes.registration.models.event import Event, EventInterviewOption
 from oes.registration.models.registration import (
     RegistrationState,
@@ -22,8 +25,10 @@ from sqlalchemy.orm import contains_eager, selectinload
 class RegistrationService:
     """Registration service."""
 
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, hook_sender: HookSender, config: Config):
         self.db = db
+        self.hook_sender = hook_sender
+        self.config = config
 
     async def create_registration(self, registration: RegistrationEntity):
         """Create a new registration entity."""
@@ -31,6 +36,10 @@ class RegistrationService:
         await self.db.flush()
 
         if registration.state == RegistrationState.created:
+            await self.hook_sender.schedule_hooks_for_event(
+                HookEvent.registration_created,
+                get_converter().unstructure(registration.get_model()),
+            )
             audit_log.bind(type=AuditLogType.registration_create).success(
                 "Registration {registration} created", registration=registration
             )

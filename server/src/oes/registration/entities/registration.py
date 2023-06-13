@@ -13,6 +13,8 @@ from oes.registration.entities.base import (
     JSONData,
 )
 from oes.registration.entities.event_stats import EventStatsEntity
+from oes.registration.hook.models import HookEvent
+from oes.registration.hook.service import HookSender
 from oes.registration.log import AuditLogType, audit_log
 from oes.registration.models.registration import (
     Registration,
@@ -265,7 +267,11 @@ class RegistrationEntity(Base):
 
         return True
 
-    def apply_changes_from_cart(self, cart_registration: CartRegistration):
+    async def apply_changes_from_cart(
+        self,
+        cart_registration: CartRegistration,
+        hook_sender: HookSender,
+    ):
         """Apply changes from a :class:`CartRegistration`.
 
         Raises:
@@ -286,9 +292,15 @@ class RegistrationEntity(Base):
 
         # Update the state
         if cart_next_state == RegistrationState.created:
-            self.complete()
+            self.complete() and await hook_sender.schedule_hooks_for_event(
+                HookEvent.registration_created,
+                get_converter().unstructure(self.get_model()),
+            )
         elif cart_next_state == RegistrationState.canceled:
-            self.cancel()
+            self.cancel() and await hook_sender.schedule_hooks_for_event(
+                HookEvent.registration_canceled,
+                get_converter().unstructure(self.get_model()),
+            )
 
     def assign_number(self, event_stats: EventStatsEntity) -> int:
         """Assign a registration number.
