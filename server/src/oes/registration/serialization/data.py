@@ -1,5 +1,4 @@
 """Converter for working with user input."""
-from builtins import issubclass
 from collections.abc import Sequence
 from enum import Enum
 from typing import Tuple, Union, get_args, get_origin

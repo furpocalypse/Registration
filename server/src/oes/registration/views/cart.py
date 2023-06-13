@@ -33,7 +33,7 @@ from oes.registration.models.event import Event, EventConfig
 from oes.registration.models.pricing import PricingResult
 from oes.registration.models.registration import Registration, RegistrationState
 from oes.registration.serialization import get_config_converter, get_converter
-from oes.registration.services.cart import CartService
+from oes.registration.services.cart import CartService, price_cart
 from oes.registration.services.interview import InterviewService
 from oes.registration.services.registration import (
     RegistrationService,
@@ -172,6 +172,7 @@ async def read_cart_pricing_result(
     id: str,
     service: CartService,
     event_config: EventConfig,
+    config: Config,
 ) -> PricingResultResponse:
     """Get the cart pricing result."""
     cart = check_not_found(await service.get_cart(id))
@@ -187,7 +188,12 @@ async def read_cart_pricing_result(
     if cart.pricing_result is None:
         event = check_not_found(event_config.get_event(model.event_id))
 
-        result = await service.price_cart(model, event)
+        result = await price_cart(
+            model,
+            config.payment.currency,
+            event,
+            config.hooks,
+        )
 
         # since the pricing result here is not final, no need to lock anything
         cart.set_pricing_result(result)

@@ -1,10 +1,13 @@
 import uuid
 from datetime import datetime
+from unittest.mock import create_autospec
 from uuid import UUID
 
 import pytest
 import pytest_asyncio
 from oes.registration.entities.registration import RegistrationEntity
+from oes.registration.hook.service import HookSender
+from oes.registration.models.config import Config
 from oes.registration.models.registration import RegistrationState
 from oes.registration.services.registration import RegistrationService
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 @pytest.fixture
 def service(db: AsyncSession):
-    return RegistrationService(db)
+    return RegistrationService(db, create_autospec(HookSender), create_autospec(Config))
 
 
 @pytest_asyncio.fixture

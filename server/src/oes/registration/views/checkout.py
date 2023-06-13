@@ -21,6 +21,7 @@ from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState
 from oes.registration.models.auth import User
 from oes.registration.models.cart import CartData
+from oes.registration.models.config import Config
 from oes.registration.models.event import EventConfig
 from oes.registration.models.payment import PaymentServiceCheckout
 from oes.registration.models.pricing import PricingResult
@@ -31,7 +32,11 @@ from oes.registration.payment.base import (
 )
 from oes.registration.serialization import get_converter
 from oes.registration.services.auth import AuthService
-from oes.registration.services.cart import CartService, validate_changes_apply
+from oes.registration.services.cart import (
+    CartService,
+    price_cart,
+    validate_changes_apply,
+)
 from oes.registration.services.checkout import CheckoutService, apply_checkout_changes
 from oes.registration.services.event import EventService
 from oes.registration.services.registration import (
@@ -59,6 +64,7 @@ async def list_available_checkout_methods(
     cart_service: CartService,
     checkout_service: CheckoutService,
     event_config: EventConfig,
+    config: Config,
     user: User,
 ) -> list[CheckoutMethod]:
     """List checkout methods."""
@@ -79,7 +85,9 @@ async def list_available_checkout_methods(
             cart_entity.pricing_result, PricingResult
         )
     else:
-        pricing_result = await cart_service.price_cart(cart_data, event)
+        pricing_result = await price_cart(
+            cart_data, config.payment.currency, event, config.hooks
+        )
         cart_entity.set_pricing_result(pricing_result)
 
     methods = await checkout_service.get_checkout_methods_for_cart(
@@ -112,6 +120,7 @@ async def create_checkout(
     checkout_service: CheckoutService,
     registration_service: RegistrationService,
     event_config: EventConfig,
+    config: Config,
     db: AsyncSession,
     user: User,
     _body: Optional[FromBytes],
@@ -136,7 +145,9 @@ async def create_checkout(
         return error_response
 
     # Price the cart (this will be the official price)
-    pricing_result = await cart_service.price_cart(cart, event)
+    pricing_result = await price_cart(
+        cart, config.payment.currency, event, config.hooks
+    )
     cart_entity.set_pricing_result(pricing_result)
 
     if not await _validate_checkout_method(

@@ -5,7 +5,7 @@ from uuid import UUID
 
 from attrs import field, frozen
 from oes.registration.models.cart import CartData
-from oes.registration.models.event import Event
+from oes.registration.models.event import SimpleEventInfo
 
 
 class PricingError(ValueError):
@@ -131,11 +131,19 @@ class PricingRequest:
     currency: str
     """The currency code."""
 
-    event: Event
+    event: SimpleEventInfo
     """Event data."""
 
     cart: CartData
     """The cart data."""
+
+
+@frozen
+class PricingEventBody:
+    """The body sent with a :class:`HookEvent.cart_price` event."""
+
+    request: PricingRequest
+    prev_result: PricingResult
 
 
 PricingFunction = Callable[

@@ -51,4 +51,4 @@ hooks:
   #       url: http://localhost:8080/my-webhook
   #   - on: cart.price
   #     hook:
-  #       python: my.pricing:function
+  #       python: tests.test_pricing:example_pricing_hook
