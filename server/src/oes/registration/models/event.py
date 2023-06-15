@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, Optional
 from attrs import Factory, field, frozen
 from oes.registration.models.identifier import validate_identifier
 from oes.template import Condition, Template, evaluate
+from typing_extensions import Self
 
 if TYPE_CHECKING:
     from oes.registration.models.auth import User
@@ -157,6 +158,32 @@ class Event:
     def is_open_to(self, user: User) -> bool:
         """Get whether the event is open to the given user."""
         return self.open and self.is_visible_to(user) or user.is_admin
+
+
+@frozen(kw_only=True)
+class SimpleEventInfo:
+    """A subset of event information sent to things like pricing hooks."""
+
+    id: str
+    name: str
+    description: Optional[str] = None
+    date: date
+    open: bool = False
+    visible: bool = False
+    registration_options: Sequence[RegistrationOption] = ()
+
+    @classmethod
+    def create(cls, event: Event) -> Self:
+        """Create from a :class:`Event`."""
+        return cls(
+            id=event.id,
+            name=event.name,
+            description=event.description,
+            date=event.date,
+            open=event.open,
+            visible=event.visible,
+            registration_options=tuple(event.registration_options),
+        )
 
 
 @frozen

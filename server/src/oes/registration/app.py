@@ -1,5 +1,6 @@
 """Web application module."""
 import argparse
+from asyncio import get_running_loop
 from functools import partial
 from ipaddress import IPv4Network, IPv6Network
 from pathlib import Path
@@ -25,6 +26,12 @@ from oes.registration.database import (
     db_session_middleware,
 )
 from oes.registration.docs import docs
+from oes.registration.hook.service import (
+    CommitCallbackService,
+    HookRetryService,
+    HookSender,
+    HookService,
+)
 from oes.registration.http_client import setup_http_client, shutdown_http_client
 from oes.registration.log import setup_logging
 from oes.registration.models.config import Config
@@ -36,10 +43,10 @@ from oes.registration.services.auth import AuthService
 from oes.registration.services.cart import CartService
 from oes.registration.services.checkout import CheckoutService
 from oes.registration.services.event import EventService
-from oes.registration.services.hook import HookRetryService
 from oes.registration.services.interview import InterviewService
 from oes.registration.services.registration import RegistrationService
 from oes.registration.views.responses import BodyValidationError, ExceptionDetails
+from rodi import GetServiceContext
 from sqlalchemy.ext.asyncio import AsyncSession
 
 app = Application()
@@ -52,6 +59,7 @@ json.use(
 )
 
 app.services.add_scoped(AuthService)
+app.services.add_scoped(HookService)
 app.services.add_scoped(EventService)
 app.services.add_scoped(RegistrationService)
 app.services.add_scoped(CartService)
@@ -122,10 +130,51 @@ def _configure_forwarded_headers(app: Application):
     )
 
 
+def _commit_callback_service_factory(
+    services: GetServiceContext,
+) -> CommitCallbackService:
+    db_config: DBConfig = services.provider[DBConfig]
+    loop = get_running_loop()
+    service = CommitCallbackService(loop)
+    service.add_listeners(db_config.session_factory)
+    return service
+
+
+def _hook_retry_service_factory(services: GetServiceContext) -> HookRetryService:
+    config: Config = services.provider[Config]
+    db_config: DBConfig = services.provider[DBConfig]
+    loop = get_running_loop()
+    return HookRetryService(loop, config.hooks, db_config.session_factory)
+
+
+def _hook_sender_factory(
+    services: GetServiceContext,
+) -> HookSender:
+    config: Config = services.provider[Config]
+    db_config: DBConfig = services.provider[DBConfig]
+    db_session: AsyncSession = services.provider[AsyncSession]
+    retry_service: HookRetryService = services.provider[HookRetryService]
+    hook_service: HookService = services.provider[HookService]
+    callback_service: CommitCallbackService = services.provider[CommitCallbackService]
+
+    return HookSender(
+        config.hooks,
+        db_config.session_factory,
+        db_session,
+        hook_service,
+        retry_service,
+        callback_service,
+    )
+
+
 async def _setup_app(config: Config, app: Application):
     db_config = DBConfig.create(config.database.url)
     app.services.add_instance(db_config)
     app.services.add_scoped_by_factory(db_session_factory, AsyncSession)
+
+    app.services.add_singleton_by_factory(_commit_callback_service_factory)
+    app.services.add_singleton_by_factory(_hook_retry_service_factory)
+    app.services.add_scoped_by_factory(_hook_sender_factory)
 
     # TODO: remove
     await db_config.create_tables()
@@ -133,18 +182,22 @@ async def _setup_app(config: Config, app: Application):
     http_client = setup_http_client()
     app.services.add_instance(http_client)
 
-    app.services.add_instance(HookRetryService(db_config))
-
     payment_services = load_services(config.payment)
     app.services.add_instance(payment_services)
 
 
 @app.on_stop
 async def _shutdown_app(app: Application):
+    db_config: DBConfig = app.service_provider[DBConfig]
+
     await app.service_provider[HookRetryService].close()
+
+    app.service_provider[CommitCallbackService].remove_listeners(
+        db_config.session_factory
+    )
+
     await shutdown_http_client()
 
-    db_config: DBConfig = app.service_provider[DBConfig]
     await db_config.close()
 
 

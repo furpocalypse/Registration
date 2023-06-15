@@ -38,3 +38,17 @@ interview:
 
   # The URL of the interview service's update endpoint
   update_url: http://localhost:8001/update
+
+# Hook configuration
+hooks:
+  # Events and hooks
+  hooks: []
+
+  # Example:
+  # hooks:
+  #   - on: registration.created
+  #     hook:
+  #       url: http://localhost:8080/my-webhook
+  #   - on: cart.price
+  #     hook:
+  #       python: tests.test_pricing:example_pricing_hook

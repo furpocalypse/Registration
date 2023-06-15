@@ -1,16 +1,18 @@
 import uuid
+from unittest.mock import create_autospec
 
 import pytest
 import pytest_asyncio
 from oes.registration.entities.cart import CartEntity
 from oes.registration.models.cart import CartData, CartRegistration
+from oes.registration.models.config import Config
 from oes.registration.services.cart import CartService
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture
 def service(db: AsyncSession):
-    return CartService(db)
+    return CartService(db, create_autospec(Config))
 
 
 @pytest_asyncio.fixture

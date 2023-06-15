@@ -7,6 +7,8 @@ from uuid import UUID
 
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState
 from oes.registration.entities.registration import RegistrationEntity
+from oes.registration.hook.models import HookEvent
+from oes.registration.hook.service import HookSender
 from oes.registration.log import AuditLogType, audit_log
 from oes.registration.models.cart import CartData
 from oes.registration.models.payment import PaymentServiceCheckout
@@ -31,9 +33,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 class CheckoutService:
     """Checkout service."""
 
-    def __init__(self, db: AsyncSession, payment_services: PaymentServices):
+    def __init__(
+        self,
+        db: AsyncSession,
+        payment_services: PaymentServices,
+        hook_sender: HookSender,
+    ):
         self.db = db
         self.payment_services = payment_services
+        self.hook_sender = hook_sender
 
     def is_service_available(self, id: str) -> bool:
         """Get whether the given service is configured and loaded."""
@@ -121,6 +129,11 @@ class CheckoutService:
 
         self.db.add(entity)
         await self.db.flush()
+
+        await self.hook_sender.schedule_hooks_for_event(
+            HookEvent.checkout_created,
+            checkout,
+        )
 
         audit_log.bind(type=AuditLogType.checkout_create).success(
             "Checkout {checkout} created, method {}",
@@ -247,7 +260,18 @@ class CheckoutService:
         if result.state != CheckoutState.canceled:
             return False
 
-        checkout.cancel(result.date_closed)
+        if checkout.cancel(result.date_closed):
+            await self.hook_sender.schedule_hooks_for_event(
+                HookEvent.checkout_canceled,
+                PaymentServiceCheckout(
+                    service=checkout.service,
+                    id=checkout.external_id,
+                    state=checkout.state,
+                    date_created=checkout.date_created,
+                    date_closed=checkout.date_closed,
+                    checkout_data=checkout.external_data,
+                ),
+            )
         return True
 
     def _apply_updated_checkout(
@@ -317,6 +341,9 @@ class CheckoutService:
             audit_log.bind(type=AuditLogType.checkout_complete).success(
                 "Checkout {checkout} completed", checkout=checkout
             )
+            await self.hook_sender.schedule_hooks_for_event(
+                HookEvent.checkout_closed, result
+            )
 
         return result
 
@@ -325,6 +352,7 @@ async def apply_checkout_changes(
     registration_service: RegistrationService,
     auth_service: AuthService,
     checkout_entity: CheckoutEntity,
+    hook_sender: HookSender,
 ) -> list[RegistrationEntity]:
     """Apply all registration changes in a checkout.
 
@@ -334,6 +362,7 @@ async def apply_checkout_changes(
         registration_service: The :class:`RegistrationService`.
         auth_service: The :class:`AuthService`.
         checkout_entity: The :class:`CheckoutEntity` to apply.
+        hook_sender: The hook sender.
 
     Returns:
         A list of the created/updated registrations.
@@ -349,7 +378,9 @@ async def apply_checkout_changes(
 
     cart_data = checkout_entity.get_cart_data()
 
-    results = await apply_changes(registration_service, auth_service, cart_data)
+    results = await apply_changes(
+        registration_service, auth_service, cart_data, hook_sender
+    )
 
     checkout_entity.changes_applied = True
     return results

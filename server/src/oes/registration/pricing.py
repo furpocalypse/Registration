@@ -1,5 +1,5 @@
 """Pricing functions."""
-from typing import Any, Optional
+from typing import Any
 from uuid import UUID
 
 from oes.registration.models.cart import CartRegistration
@@ -13,14 +13,15 @@ from oes.registration.models.pricing import (
 
 
 async def default_pricing(
-    request: PricingRequest, prev_result: Optional[PricingResult]
+    event: Event,
+    request: PricingRequest,
 ) -> PricingResult:
     """The default pricing function."""
     items = []
 
     for cart_reg in request.cart.registrations:
-        eval_ctx = get_pricing_eval_context(request.event, cart_reg)
-        items.extend(_eval_line_items(cart_reg, request.event, eval_ctx))
+        eval_ctx = get_pricing_eval_context(event, cart_reg)
+        items.extend(_eval_line_items(cart_reg, event, eval_ctx))
 
     return PricingResult(
         currency=request.currency,

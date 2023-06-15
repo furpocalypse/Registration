@@ -13,10 +13,13 @@ from oes.registration.entities.base import (
     JSONData,
 )
 from oes.registration.entities.event_stats import EventStatsEntity
+from oes.registration.hook.models import HookEvent
+from oes.registration.hook.service import HookSender
 from oes.registration.log import AuditLogType, audit_log
 from oes.registration.models.registration import (
     Registration,
     RegistrationState,
+    RegistrationUpdatedEvent,
     WritableRegistration,
 )
 from oes.registration.serialization import get_converter
@@ -265,7 +268,11 @@ class RegistrationEntity(Base):
 
         return True
 
-    def apply_changes_from_cart(self, cart_registration: CartRegistration):
+    async def apply_changes_from_cart(
+        self,
+        cart_registration: CartRegistration,
+        hook_sender: HookSender,
+    ):
         """Apply changes from a :class:`CartRegistration`.
 
         Raises:
@@ -274,21 +281,48 @@ class RegistrationEntity(Base):
         if not self.validate_changes_from_cart(cart_registration):
             raise InvalidChangeError(cart_registration.id)
 
-        cart_next_state = cart_registration.new_data.get("state")
-
         # Extract the writable attributes
         writable = get_converter().structure(
             cart_registration.new_data, WritableRegistration
         )
 
         # Update
+        old_data = self.get_model()
         self.update_properties_from_model(writable)
+        state_change_event = self._update_state_from_cart(cart_registration)
 
-        # Update the state
-        if cart_next_state == RegistrationState.created:
-            self.complete()
-        elif cart_next_state == RegistrationState.canceled:
-            self.cancel()
+        new_data = self.get_model()
+
+        await hook_sender.schedule_hooks_for_event(
+            HookEvent.registration_updated,
+            RegistrationUpdatedEvent(
+                old_data=old_data,
+                new_data=new_data,
+            ),
+        )
+
+        if state_change_event:
+            await hook_sender.schedule_hooks_for_event(
+                state_change_event,
+                new_data,
+            )
+
+    def _update_state_from_cart(self, cart_registration: CartRegistration):
+        """Complete or cancel the registration based on the cart changes.
+
+        Returns:
+            The appropriate hook event.
+        """
+        new_state = cart_registration.new_data.get("state")
+
+        if new_state == RegistrationState.created:
+            changed = self.complete()
+            return HookEvent.registration_created if changed else None
+        elif new_state == RegistrationState.canceled:
+            changed = self.cancel()
+            return HookEvent.registration_canceled if changed else None
+        else:
+            return None
 
     def assign_number(self, event_stats: EventStatsEntity) -> int:
         """Assign a registration number.

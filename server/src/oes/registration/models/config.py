@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from typing import Any, NewType, Optional
 
 from attrs import field, frozen, validators
+from oes.registration.hook.models import HookConfig
 
 
 @frozen
@@ -69,3 +70,4 @@ class Config:
     auth: AuthConfig
     payment: PaymentConfig
     interview: InterviewConfig
+    hooks: HookConfig

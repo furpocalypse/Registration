@@ -1,30 +1,15 @@
-"""Hook entities."""
+"""Hook database entities."""
 from __future__ import annotations
 
 import uuid
 from datetime import datetime, timedelta
 from typing import Any, Optional
 
-from oes.hook import Hook
 from oes.registration.entities.base import PKUUID, Base, JSONData
+from oes.registration.hook.models import NUM_RETRIES, RETRY_SECONDS, HookConfigEntry
 from oes.registration.serialization import get_config_converter
 from oes.registration.util import get_now
 from sqlalchemy.orm import Mapped
-
-RETRY_SECONDS = (
-    5,
-    30,
-    60,
-    600,
-    3600,
-    7200,
-    43200,
-    86400,
-)
-"""How many seconds between each retry."""
-
-NUM_RETRIES = len(RETRY_SECONDS)
-"""Number of attempts to re-send a hook."""
 
 
 class HookLogEntity(Base):
@@ -48,9 +33,11 @@ class HookLogEntity(Base):
     """Hook data body."""
 
     @classmethod
-    def create(cls, hook: Hook, body: dict[str, Any]) -> HookLogEntity:
+    def create(
+        cls, hook_config: HookConfigEntry, body: dict[str, Any]
+    ) -> HookLogEntity:
         """Create a hook log entity."""
-        config = get_config_converter().unstructure(hook)
+        config = get_config_converter().unstructure(hook_config)
 
         return HookLogEntity(
             id=uuid.uuid4(),
@@ -60,14 +47,14 @@ class HookLogEntity(Base):
             body=body,
         )
 
-    def get_hook(self) -> Hook:
-        """Get the :class:`Hook` object."""
-        return get_config_converter().structure(self.config, Hook)
+    def get_config_entry(self) -> HookConfigEntry:
+        """Get the :class:`HookConfigEntry` object."""
+        return get_config_converter().structure(self.config, HookConfigEntry)
 
     def get_is_retryable(self, *, now: Optional[datetime] = None) -> bool:
         """Get whether this hook is eligible for retry."""
         now = now if now is not None else get_now()
-        return self.retry_at is not None and self.retry_at <= now
+        return self.attempts == 0 or self.retry_at is not None and self.retry_at <= now
 
     def update_attempts(self) -> Optional[datetime]:
         """Update the number of attempts and set the next retry time."""

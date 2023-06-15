@@ -4,7 +4,7 @@ from enum import Enum
 from typing import Any, Optional, Union
 from uuid import UUID
 
-from attrs import Factory, define, field
+from attrs import Factory, define, field, frozen
 from cattrs import ClassValidationError, Converter
 
 
@@ -59,6 +59,14 @@ class SelfServiceRegistration:
     title: Optional[str] = None
     subtitle: Optional[str] = None
     description: Optional[str] = None
+
+
+@frozen
+class RegistrationUpdatedEvent:
+    """The body sent with a :class:`HookEvent.registration_updated` event."""
+
+    old_data: Registration
+    new_data: Registration
 
 
 READ_ONLY_FIELDS = frozenset(
