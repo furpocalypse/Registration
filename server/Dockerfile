@@ -18,11 +18,12 @@ RUN adduser -h /app -H -D python \
     && mkdir /config
 COPY --from=build /app/ /app/
 COPY alembic/ /app/alembic/
-COPY alembic.ini /app/
-RUN sed -i "s:^config_file =.*:config_file = /config/config.yml:" /app/alembic.ini \
-    && chmod u=rw,g=r,o=r /app/alembic.ini \
+COPY alembic.ini /config/
+RUN chmod u=rw,g=r,o=r /config/alembic.ini \
     && chmod -R u=rwX,g=rX,o=rX /app/alembic
-WORKDIR /config
+WORKDIR /app
 USER python
 ENV PATH=$PATH:/app/bin
+ENV ALEMBIC_CONFIG=/config/alembic.ini
 ENTRYPOINT ["/app/bin/oes-registration"]
+CMD ["--config", "/config/config.yml", "--events", "/config/events.yml"]
