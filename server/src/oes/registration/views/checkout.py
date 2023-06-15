@@ -19,6 +19,7 @@ from oes.registration.auth import RequireCart
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState
+from oes.registration.hook.service import HookSender
 from oes.registration.models.auth import User
 from oes.registration.models.cart import CartData
 from oes.registration.models.config import Config
@@ -218,6 +219,7 @@ async def update_checkout(
     auth_service: AuthService,
     event_service: EventService,
     events: EventConfig,
+    hook_sender: HookSender,
     db: AsyncSession,
     user: User,
 ) -> Response:
@@ -252,7 +254,12 @@ async def update_checkout(
 
     try:
         response = await _handle_update(
-            registration_service, auth_service, event_service, checkout, result
+            registration_service,
+            auth_service,
+            event_service,
+            checkout,
+            result,
+            hook_sender,
         )
         await db.commit()
         return response
@@ -285,13 +292,17 @@ async def _handle_update(
     event_service: EventService,
     checkout_entity: CheckoutEntity,
     checkout_result: PaymentServiceCheckout,
+    hook_sender: HookSender,
 ):
     if (
         checkout_result.state == CheckoutState.complete
         and not checkout_entity.changes_applied
     ):
         updated = await apply_checkout_changes(
-            registration_service, auth_service, checkout_entity
+            registration_service,
+            auth_service,
+            checkout_entity,
+            hook_sender,
         )
         cart_data = checkout_entity.get_cart_data()
         event_id = cart_data.event_id
