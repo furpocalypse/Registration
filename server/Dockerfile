@@ -17,6 +17,13 @@ FROM python AS target
 RUN adduser -h /app -H -D python \
     && mkdir /config
 COPY --from=build /app/ /app/
-WORKDIR /config
+COPY alembic/ /app/alembic/
+COPY alembic.ini /config/
+RUN chmod u=rw,g=r,o=r /config/alembic.ini \
+    && chmod -R u=rwX,g=rX,o=rX /app/alembic
+WORKDIR /app
 USER python
+ENV PATH=$PATH:/app/bin
+ENV ALEMBIC_CONFIG=/config/alembic.ini
 ENTRYPOINT ["/app/bin/oes-registration"]
+CMD ["--config", "/config/config.yml", "--events", "/config/events.yml"]

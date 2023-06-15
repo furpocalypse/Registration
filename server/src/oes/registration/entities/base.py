@@ -12,7 +12,6 @@ from sqlalchemy.orm import DeclarativeBase, mapped_column
 DEFAULT_MAX_STRING_LENGTH = 300
 """Default maximum length of a string."""
 
-
 DEFAULT_MAX_ENUM_LENGTH = 16
 """Default length of an enum string value."""
 
@@ -61,3 +60,13 @@ class Base(DeclarativeBase):
         datetime: DateTime(timezone=True),
         str: String(DEFAULT_MAX_STRING_LENGTH),
     }
+
+
+def import_entities():
+    """Import all modules that contain entities."""
+    from oes.registration.entities import access_code  # noqa
+    from oes.registration.entities import auth  # noqa
+    from oes.registration.entities import cart  # noqa
+    from oes.registration.entities import checkout  # noqa
+    from oes.registration.entities import event_stats  # noqa
+    from oes.registration.entities import registration  # noqa

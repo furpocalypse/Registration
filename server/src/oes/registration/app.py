@@ -176,9 +176,6 @@ async def _setup_app(config: Config, app: Application):
     app.services.add_singleton_by_factory(_hook_retry_service_factory)
     app.services.add_scoped_by_factory(_hook_sender_factory)
 
-    # TODO: remove
-    await db_config.create_tables()
-
     http_client = setup_http_client()
     app.services.add_instance(http_client)
 
