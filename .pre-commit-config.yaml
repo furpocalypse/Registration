@@ -38,6 +38,7 @@ repos:
     rev: 6.0.0
     hooks:
       - id: flake8
+        exclude: ^server/alembic/versions/
         additional_dependencies:
           - flake8-simplify
           - flake8-newspaper-style

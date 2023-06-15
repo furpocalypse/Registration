@@ -3,6 +3,7 @@ import asyncio
 from pathlib import Path
 
 from alembic import context
+from oes.registration.entities.base import import_entities
 from oes.registration.entities.base import metadata as target_metadata
 from oes.registration.log import setup_logging
 from ruamel.yaml import YAML
@@ -13,6 +14,8 @@ setup_logging()
 
 yaml = YAML(typ="safe")
 config = context.config
+
+import_entities()
 
 
 def run_migrations_offline() -> None:

@@ -8,7 +8,7 @@ from typing import Optional
 
 import orjson
 from attrs import frozen
-from oes.registration.entities.base import metadata
+from oes.registration.entities.base import import_entities, metadata
 from oes.registration.serialization.json import json_default
 from rodi import GetServiceContext
 from sqlalchemy.ext.asyncio import (
@@ -43,12 +43,7 @@ class DBConfig:
 
     async def create_tables(self):
         """Create all database tables."""
-        # Import modules that define entities
-        import oes.registration.entities.cart  # noqa
-        import oes.registration.entities.checkout  # noqa
-        import oes.registration.entities.event_stats  # noqa
-        import oes.registration.entities.registration  # noqa
-
+        import_entities()
         async with self.engine.begin() as conn:
             await conn.run_sync(metadata.create_all)
 
