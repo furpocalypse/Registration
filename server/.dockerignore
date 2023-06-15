@@ -2,3 +2,5 @@
 !src
 !pyproject.toml
 !poetry.lock
+!alembic
+!alembic.ini
