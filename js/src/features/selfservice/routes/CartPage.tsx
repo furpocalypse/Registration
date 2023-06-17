@@ -1,4 +1,4 @@
-import { Title } from "#src/components/title/Title.js"
+import { Subtitle, Title } from "#src/components/title/Title.js"
 import { fetchCartPricingResult } from "#src/features/cart/api.js"
 import { useCurrentCartStore } from "#src/features/cart/hooks.js"
 import { Cart } from "#src/features/cart/types.js"
@@ -9,8 +9,8 @@ import {
 import { useWretch } from "#src/hooks/api.js"
 import { LineItem as LineItemComponent } from "#src/features/cart/components/LineItem.js"
 import { Modifier as ModifierComponent } from "#src/features/cart/components/Modifier.js"
-import { Button, Grid, Stack } from "@mantine/core"
-import { IconShoppingCart } from "@tabler/icons-react"
+import { Anchor, Box, Button, Grid, Group, Stack, Text } from "@mantine/core"
+import { IconAlertCircle, IconShoppingCart } from "@tabler/icons-react"
 import { useLocation, useNavigate } from "#src/hooks/location.js"
 import { observer } from "mobx-react-lite"
 import { useLoader } from "#src/hooks/loader.js"
@@ -20,6 +20,7 @@ import { CheckoutManager } from "#src/features/checkout/components/checkout/Chec
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useSelfServiceLoader } from "#src/features/selfservice/hooks.js"
+import { Link as RLink } from "react-router-dom"
 
 export const CartPage = observer(() => {
   const { eventId = "" } = useParams()
@@ -35,24 +36,41 @@ export const CartPage = observer(() => {
     }
   }, [currentCartStore.loader, currentCartStore.currentCartId])
 
-  if (cartId && cart) {
-    return (
-      <cart.Component>
-        {(_cart) => (
-          <Title title="Cart">
-            <Stack>
-              <CartView key={cartId} cartId={cartId} eventId={eventId} />
-            </Stack>
-          </Title>
-        )}
-      </cart.Component>
-    )
-  } else {
-    return null
-  }
+  return (
+    <Title title="Cart">
+      <Subtitle subtitle="Your current shopping cart.">
+        <Stack>
+          <Box>
+            <Anchor component={RLink} to={`/events/${eventId}`}>
+              &laquo; Back to registrations
+            </Anchor>
+          </Box>
+          {cart && cartId ? (
+            <cart.Component placeholder={<CartViewPlaceholder />}>
+              {(_cart) => (
+                <CartView key={cartId} cartId={cartId} eventId={eventId} />
+              )}
+            </cart.Component>
+          ) : (
+            <CartViewPlaceholder />
+          )}
+        </Stack>
+      </Subtitle>
+    </Title>
+  )
 })
 
 CartPage.displayName = "CartPage"
+
+const CartViewPlaceholder = () => (
+  <Title title="Cart">
+    <Subtitle subtitle="Your current shopping cart.">
+      <Stack>
+        <CartPlaceholder />
+      </Stack>
+    </Subtitle>
+  </Title>
+)
 
 const CartView = observer(
   ({ cartId, eventId }: { cartId: string; eventId: string }) => {
@@ -87,34 +105,38 @@ const CartView = observer(
       loader.value.line_items.length > 0
 
     return (
-      <loader.Component placeholder={<CartPlaceholderView />}>
+      <loader.Component placeholder={<CartPlaceholder />}>
         {(result) => (
           <>
-            <CartComponent totalPrice={result.total_price}>
-              {result.line_items.map((li, i) => (
-                <LineItemComponent
-                  key={i}
-                  onRemove={async () => {
-                    const [newId, newCart] =
-                      await currentCartStore.cartStore.removeRegistrationFromCart(
-                        cartId,
-                        li.registration_id
-                      )
-                    currentCartStore.setCurrentCart(newId, newCart)
-                  }}
-                  name={li.name}
-                  description={li.description}
-                  price={li.price}
-                  modifiers={li.modifiers.map((m, i) => (
-                    <ModifierComponent
-                      key={i}
-                      name={m.name}
-                      amount={m.amount}
-                    />
-                  ))}
-                />
-              ))}
-            </CartComponent>
+            {result.line_items.length > 0 ? (
+              <CartComponent totalPrice={result.total_price}>
+                {result.line_items.map((li, i) => (
+                  <LineItemComponent
+                    key={i}
+                    onRemove={async () => {
+                      const [newId, newCart] =
+                        await currentCartStore.cartStore.removeRegistrationFromCart(
+                          cartId,
+                          li.registration_id
+                        )
+                      currentCartStore.setCurrentCart(newId, newCart)
+                    }}
+                    name={li.name}
+                    description={li.description}
+                    price={li.price}
+                    modifiers={li.modifiers.map((m, i) => (
+                      <ModifierComponent
+                        key={i}
+                        name={m.name}
+                        amount={m.amount}
+                      />
+                    ))}
+                  />
+                ))}
+              </CartComponent>
+            ) : (
+              <EmptyCartView />
+            )}
             {checkoutAvailable && (
               <Grid>
                 <Grid.Col xs={12} sm="content">
@@ -147,10 +169,13 @@ const CartView = observer(
 
 CartView.displayName = "CartView"
 
-const CartPlaceholderView = () => {
-  return (
-    <>
-      <CartPlaceholder />
-    </>
-  )
-}
+const EmptyCartView = () => (
+  <Text color="dimmed">
+    <Group align="center">
+      <IconAlertCircle />
+      <Text span inline>
+        Your cart is empty.
+      </Text>
+    </Group>
+  </Text>
+)

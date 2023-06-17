@@ -1,7 +1,7 @@
 import { Title as PageTitle, Subtitle } from "#src/components/title/Title.js"
 import { useParams } from "react-router-dom"
 import { CardGrid } from "#src/features/selfservice/components/card/CardGrid.js"
-import { Box, Button, Grid } from "@mantine/core"
+import { Anchor, Box, Button, Grid } from "@mantine/core"
 import { IconPlus } from "@tabler/icons-react"
 import {
   RegistrationCard,
@@ -23,6 +23,7 @@ import {
 } from "#src/features/cart/utils.js"
 import { useEvents } from "#src/features/event/hooks.js"
 import { useCurrentCartStore } from "#src/features/cart/hooks.js"
+import { Link as RLink } from "react-router-dom"
 
 const RegistrationsView = observer(
   ({
@@ -122,14 +123,21 @@ export const EventPage = () => {
                 <Box
                   sx={(theme) => ({
                     display: "none",
-                    [`(max-width: ${theme.breakpoints.sm})`]: {
+                    [`@media (max-width: ${theme.breakpoints.sm})`]: {
                       display: "block",
                       flex: "auto",
                     },
                   })}
                 />
                 {results.add_options.length > 0 && (
-                  <Grid>
+                  <Grid
+                    align="center"
+                    sx={(theme) => ({
+                      [`@media (max-width: ${theme.breakpoints.sm})`]: {
+                        justifyContent: "center",
+                      },
+                    })}
+                  >
                     <Grid.Col span={12} sm="content">
                       <Button
                         variant="filled"
@@ -150,6 +158,17 @@ export const EventPage = () => {
                         Add Registration
                       </Button>
                     </Grid.Col>
+                    {currentCartStore.loader?.value?.registrations.length && (
+                      <Grid.Col span="content">
+                        <Anchor
+                          component={RLink}
+                          to={`/events/${eventId}/cart`}
+                        >
+                          View cart (
+                          {currentCartStore.loader.value.registrations.length})
+                        </Anchor>
+                      </Grid.Col>
+                    )}
                   </Grid>
                 )}
                 <OptionsDialogManager
