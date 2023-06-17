@@ -24,6 +24,8 @@ using the registration HTTP API.
 
 - Build the production bundle with `npm run build`.
 
+You can add simulated latency with the `DELAY` environment variable like `DELAY=1000 npm start`
+
 ## Configuration
 
 - Copy `config.example.json` to `config.json` and edit the settings:

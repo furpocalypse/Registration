@@ -1,5 +1,6 @@
 const path = require("path")
 const HtmlWebpackPlugin = require("html-webpack-plugin")
+const { DefinePlugin } = require("webpack")
 
 module.exports = (env, argv) => {
   const prod = argv.mode !== "development"
@@ -50,6 +51,10 @@ module.exports = (env, argv) => {
       },
     },
     plugins: [
+      // env vars
+      new DefinePlugin({
+        "process.env.DELAY": JSON.stringify(process.env.DELAY),
+      }),
       // html page for each entry point
       new HtmlWebpackPlugin({
         title: "Registration",

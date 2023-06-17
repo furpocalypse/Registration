@@ -2,7 +2,10 @@ import { Title } from "#src/components/title/Title.js"
 import { fetchCartPricingResult } from "#src/features/cart/api.js"
 import { useCurrentCartStore } from "#src/features/cart/hooks.js"
 import { Cart } from "#src/features/cart/types.js"
-import { Cart as CartComponent } from "#src/features/cart/components/Cart.js"
+import {
+  Cart as CartComponent,
+  CartPlaceholder,
+} from "#src/features/cart/components/Cart.js"
 import { useWretch } from "#src/hooks/api.js"
 import { LineItem as LineItemComponent } from "#src/features/cart/components/LineItem.js"
 import { Modifier as ModifierComponent } from "#src/features/cart/components/Modifier.js"
@@ -17,6 +20,39 @@ import { CheckoutManager } from "#src/features/checkout/components/checkout/Chec
 import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useSelfServiceLoader } from "#src/features/selfservice/hooks.js"
+
+export const CartPage = observer(() => {
+  const { eventId = "" } = useParams()
+  const currentCartStore = useCurrentCartStore()
+
+  const [cartId, setCartId] = useState<string | null>(null)
+  const [cart, setCart] = useState<Loader<Cart> | null>(null)
+
+  useEffect(() => {
+    if (currentCartStore.loader && currentCartStore.currentCartId) {
+      setCart(currentCartStore.loader)
+      setCartId(currentCartStore.currentCartId)
+    }
+  }, [currentCartStore.loader, currentCartStore.currentCartId])
+
+  if (cartId && cart) {
+    return (
+      <cart.Component>
+        {(_cart) => (
+          <Title title="Cart">
+            <Stack>
+              <CartView key={cartId} cartId={cartId} eventId={eventId} />
+            </Stack>
+          </Title>
+        )}
+      </cart.Component>
+    )
+  } else {
+    return null
+  }
+})
+
+CartPage.displayName = "CartPage"
 
 const CartView = observer(
   ({ cartId, eventId }: { cartId: string; eventId: string }) => {
@@ -51,7 +87,7 @@ const CartView = observer(
       loader.value.line_items.length > 0
 
     return (
-      <loader.Component>
+      <loader.Component placeholder={<CartPlaceholderView />}>
         {(result) => (
           <>
             <CartComponent totalPrice={result.total_price}>
@@ -111,35 +147,10 @@ const CartView = observer(
 
 CartView.displayName = "CartView"
 
-export const CartPage = observer(() => {
-  const { eventId = "" } = useParams()
-  const currentCartStore = useCurrentCartStore()
-
-  const [cartId, setCartId] = useState<string | null>(null)
-  const [cart, setCart] = useState<Loader<Cart> | null>(null)
-
-  useEffect(() => {
-    if (currentCartStore.loader && currentCartStore.currentCartId) {
-      setCart(currentCartStore.loader)
-      setCartId(currentCartStore.currentCartId)
-    }
-  }, [currentCartStore.loader, currentCartStore.currentCartId])
-
-  if (cartId && cart) {
-    return (
-      <cart.Component>
-        {(_cart) => (
-          <Title title="Cart">
-            <Stack>
-              <CartView key={cartId} cartId={cartId} eventId={eventId} />
-            </Stack>
-          </Title>
-        )}
-      </cart.Component>
-    )
-  } else {
-    return null
-  }
-})
-
-CartPage.displayName = "CartPage"
+const CartPlaceholderView = () => {
+  return (
+    <>
+      <CartPlaceholder />
+    </>
+  )
+}
