@@ -24,6 +24,7 @@ import {
 } from "#src/features/cart/utils.js"
 import { useEvents } from "#src/features/event/hooks.js"
 import { useCurrentCartStore } from "#src/features/cart/hooks.js"
+import { useEffect } from "react"
 
 const RegistrationsView = observer(
   ({

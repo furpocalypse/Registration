@@ -1,3 +1,4 @@
+import { useMemo } from "react"
 import {
   Location,
   NavigateOptions,
@@ -38,13 +39,15 @@ export interface TypedNavigateFunction {
 export const useNavigate = (): TypedNavigateFunction => {
   const origNavigate = originalUseNavigate()
 
-  const navigate = (to: To | number, options?: TypedNavigateOptions) => {
-    if (typeof to === "number") {
-      return origNavigate(to)
-    } else {
-      return origNavigate(to, options)
+  return useMemo(() => {
+    const navigate = (to: To | number, options?: TypedNavigateOptions) => {
+      if (typeof to === "number") {
+        return origNavigate(to)
+      } else {
+        return origNavigate(to, options)
+      }
     }
-  }
 
-  return navigate
+    return navigate
+  }, [origNavigate])
 }
