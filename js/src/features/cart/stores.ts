@@ -1,7 +1,7 @@
 import { fetchCart, fetchEmptyCart } from "#src/features/cart/api.js"
 import { Cart } from "#src/features/cart/types.js"
 import { getCurrentCartId, setCurrentCartId } from "#src/features/cart/utils.js"
-import { Loader, createLoader } from "#src/util/loader.js"
+import { Loader, NotFoundError, createLoader } from "#src/util/loader.js"
 import { makeAutoObservable, reaction, runInAction } from "mobx"
 import { Wretch } from "wretch"
 
@@ -65,13 +65,19 @@ export class CurrentCartStore {
       return null
     }
 
-    const cart = await this.cartStore.load(id)
+    try {
+      const cart = await this.cartStore.load(id)
 
-    if (!cart || cart.event_id != this.eventId) {
-      return null
+      if (cart.event_id != this.eventId) {
+        return null
+      }
+      return cart
+    } catch (e) {
+      if (e instanceof NotFoundError) {
+        return null
+      }
+      throw e
     }
-
-    return cart
   }
 
   /**
