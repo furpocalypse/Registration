@@ -3,6 +3,7 @@ import {
   TitlePlaceholder,
 } from "#src/components/title/Title.js"
 import {
+  ActionIcon,
   AppShell,
   AppShellProps,
   Container,
@@ -17,7 +18,8 @@ import {
   createStyles,
   useComponentDefaultProps,
 } from "@mantine/core"
-import { ReactNode } from "react"
+import { IconHome } from "@tabler/icons-react"
+import { ComponentType, ReactNode } from "react"
 
 const layoutStyles = createStyles((theme) => ({
   root: {
@@ -33,7 +35,12 @@ const layoutStyles = createStyles((theme) => ({
     alignItems: "stretch",
   },
   header: {
+    display: "flex",
+    alignItems: "center",
     marginBottom: theme.spacing.md,
+  },
+  homeIcon: {
+    marginLeft: "1rem",
   },
   container: {
     padding: 16,
@@ -48,6 +55,8 @@ const layoutStyles = createStyles((theme) => ({
 
 export type SimpleLayoutProps = {
   children?: ReactNode
+  logo?: ComponentType<Record<string, never>> | string
+  homeUrl?: string
   HeaderProps?: HeaderProps
   ContainerProps?: ContainerProps
 } & DefaultProps<Selectors<typeof layoutStyles>> &
@@ -60,6 +69,8 @@ export const SimpleLayout = (props: SimpleLayoutProps) => {
     styles,
     unstyled,
     children,
+    logo: Logo,
+    homeUrl,
     HeaderProps,
     ContainerProps,
     ...other
@@ -77,7 +88,20 @@ export const SimpleLayout = (props: SimpleLayoutProps) => {
       <AppShell
         header={
           <Header height={48} className={classes.header} {...HeaderProps}>
-            Header
+            <ActionIcon
+              className={classes.homeIcon}
+              component="a"
+              href={homeUrl ?? "/"}
+              title="Home"
+            >
+              {typeof Logo === "function" ? (
+                <Logo />
+              ) : typeof Logo === "string" ? (
+                <img src={Logo} alt="" />
+              ) : (
+                <IconHome />
+              )}
+            </ActionIcon>
           </Header>
         }
         className={cx(classes.root, className)}
