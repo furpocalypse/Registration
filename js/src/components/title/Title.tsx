@@ -74,12 +74,10 @@ export const Subtitle = ({
   useLayoutEffect(() => {
     runInAction(() => {
       state.subtitle.push(subtitle)
-      console.log("push", subtitle)
     })
 
     return action(() => {
       state.subtitle.pop()
-      console.log("pop", subtitle)
     })
   }, [])
 
