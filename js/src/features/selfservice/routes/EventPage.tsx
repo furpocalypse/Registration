@@ -1,9 +1,8 @@
 import { Title as PageTitle, Subtitle } from "#src/components/title/Title.js"
 import { useParams } from "react-router-dom"
 import { CardGrid } from "#src/features/selfservice/components/card/CardGrid.js"
-import { Box, Button, Grid, useMantineTheme } from "@mantine/core"
+import { Box, Button, Grid } from "@mantine/core"
 import { IconPlus } from "@tabler/icons-react"
-import { useMediaQuery } from "@mantine/hooks"
 import {
   RegistrationCard,
   RegistrationCardPlaceholder,
@@ -24,7 +23,6 @@ import {
 } from "#src/features/cart/utils.js"
 import { useEvents } from "#src/features/event/hooks.js"
 import { useCurrentCartStore } from "#src/features/cart/hooks.js"
-import { useEffect } from "react"
 
 const RegistrationsView = observer(
   ({
@@ -98,9 +96,6 @@ export const EventPage = () => {
   const selfService = useSelfServiceLoader()
   const currentCartStore = useCurrentCartStore()
 
-  const theme = useMantineTheme()
-  const large = useMediaQuery(`(min-width: ${theme.breakpoints.sm})`)
-
   const loc = useLocation()
   const navigate = useNavigate()
 
@@ -123,36 +118,39 @@ export const EventPage = () => {
                   event={event}
                   registrations={results.registrations}
                 />
+                {/* Spacer only for small screens */}
                 <Box
-                  sx={{
-                    flex: large ? "initial" : "auto",
-                  }}
+                  sx={(theme) => ({
+                    display: "none",
+                    [`(max-width: ${theme.breakpoints.sm})`]: {
+                      display: "block",
+                      flex: "auto",
+                    },
+                  })}
                 />
                 {results.add_options.length > 0 && (
-                  <>
-                    <Grid>
-                      <Grid.Col span={12} sm="content">
-                        <Button
-                          variant="filled"
-                          leftIcon={<IconPlus />}
-                          fullWidth
-                          onClick={() => {
-                            // show dialog
-                            navigate(loc, {
-                              state: {
-                                ...loc.state,
-                                showAddOptionsDialog: {
-                                  eventId: eventId,
-                                },
+                  <Grid>
+                    <Grid.Col span={12} sm="content">
+                      <Button
+                        variant="filled"
+                        leftIcon={<IconPlus />}
+                        fullWidth
+                        onClick={() => {
+                          // show dialog
+                          navigate(loc, {
+                            state: {
+                              ...loc.state,
+                              showAddOptionsDialog: {
+                                eventId: eventId,
                               },
-                            })
-                          }}
-                        >
-                          Add Registration
-                        </Button>
-                      </Grid.Col>
-                    </Grid>
-                  </>
+                            },
+                          })
+                        }}
+                      >
+                        Add Registration
+                      </Button>
+                    </Grid.Col>
+                  </Grid>
                 )}
                 <OptionsDialogManager
                   eventId={eventId}

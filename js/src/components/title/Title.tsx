@@ -1,6 +1,6 @@
 import { action, autorun, makeAutoObservable, runInAction } from "mobx"
 import { observer } from "mobx-react-lite"
-import { ReactNode, createContext, useContext, useEffect } from "react"
+import { ReactNode, createContext, useContext, useLayoutEffect } from "react"
 
 class TitleState {
   title: string[] = []
@@ -49,7 +49,7 @@ export const Title = ({
 }) => {
   const state = useContext(TitleContext)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     runInAction(() => {
       state.title.push(title)
     })
@@ -71,13 +71,15 @@ export const Subtitle = ({
 }) => {
   const state = useContext(TitleContext)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     runInAction(() => {
       state.subtitle.push(subtitle)
+      console.log("push", subtitle)
     })
 
     return action(() => {
       state.subtitle.pop()
+      console.log("pop", subtitle)
     })
   }, [])
 
