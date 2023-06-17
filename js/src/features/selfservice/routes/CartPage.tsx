@@ -26,8 +26,10 @@ export const CartPage = observer(() => {
   const { eventId = "" } = useParams()
   const currentCartStore = useCurrentCartStore()
 
-  const [cartId, setCartId] = useState<string | null>(null)
-  const [cart, setCart] = useState<Loader<Cart> | null>(null)
+  const [cartId, setCartId] = useState<string | null>(
+    currentCartStore.currentCartId
+  )
+  const [cart, setCart] = useState<Loader<Cart> | null>(currentCartStore.loader)
 
   useEffect(() => {
     if (currentCartStore.loader && currentCartStore.currentCartId) {

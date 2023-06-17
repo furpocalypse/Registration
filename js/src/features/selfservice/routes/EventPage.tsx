@@ -25,70 +25,6 @@ import { useEvents } from "#src/features/event/hooks.js"
 import { useCurrentCartStore } from "#src/features/cart/hooks.js"
 import { Link as RLink } from "react-router-dom"
 
-const RegistrationsView = observer(
-  ({
-    event,
-    registrations,
-  }: {
-    event: Event
-    registrations: SelfServiceRegistrationResponse[]
-  }) => {
-    const navigate = useNavigate()
-    const loc = useLocation()
-    const wretch = useWretch()
-    const interviewState = useInterviewState()
-
-    return (
-      <CardGrid sx={{ minHeight: 200 }}>
-        {registrations.map((r) => (
-          <RegistrationCard
-            key={r.registration.id}
-            title={r.registration.title}
-            subtitle={r.registration.subtitle}
-            menuOptions={r.change_options.map((o) => ({
-              id: o.id,
-              label: o.name,
-            }))}
-            onMenuSelect={async (id) => {
-              let cartId = getCurrentCartId()
-              if (!cartId) {
-                const [curOrEmptyCartId] = await fetchCurrentOrEmptyCart(
-                  wretch,
-                  event.id
-                )
-                cartId = curOrEmptyCartId
-              }
-
-              const state = await fetchCartInterview(
-                wretch,
-                cartId,
-                id,
-                r.registration.id
-              )
-              const next = await interviewState.startInterview(state, {
-                cartId: cartId,
-                eventId: event.id,
-              })
-              // show dialog
-              navigate(loc, {
-                state: {
-                  ...loc.state,
-                  showInterviewDialog: {
-                    eventId: event.id,
-                    recordId: next.id,
-                  },
-                },
-              })
-            }}
-          >
-            {r.registration.description}
-          </RegistrationCard>
-        ))}
-      </CardGrid>
-    )
-  }
-)
-
 export const EventPage = () => {
   const { eventId = "" } = useParams()
   const wretch = useWretch()
@@ -208,3 +144,69 @@ export const EventPage = () => {
     </PageTitle>
   )
 }
+
+const RegistrationsView = observer(
+  ({
+    event,
+    registrations,
+  }: {
+    event: Event
+    registrations: SelfServiceRegistrationResponse[]
+  }) => {
+    const navigate = useNavigate()
+    const loc = useLocation()
+    const wretch = useWretch()
+    const interviewState = useInterviewState()
+
+    return (
+      <CardGrid sx={{ minHeight: 200 }}>
+        {registrations.map((r) => (
+          <RegistrationCard
+            key={r.registration.id}
+            title={r.registration.title}
+            subtitle={r.registration.subtitle}
+            menuOptions={r.change_options.map((o) => ({
+              id: o.id,
+              label: o.name,
+            }))}
+            onMenuSelect={async (id) => {
+              let cartId = getCurrentCartId()
+              if (!cartId) {
+                const [curOrEmptyCartId] = await fetchCurrentOrEmptyCart(
+                  wretch,
+                  event.id
+                )
+                cartId = curOrEmptyCartId
+              }
+
+              const state = await fetchCartInterview(
+                wretch,
+                cartId,
+                id,
+                r.registration.id
+              )
+              const next = await interviewState.startInterview(state, {
+                cartId: cartId,
+                eventId: event.id,
+              })
+              // show dialog
+              navigate(loc, {
+                state: {
+                  ...loc.state,
+                  showInterviewDialog: {
+                    eventId: event.id,
+                    recordId: next.id,
+                  },
+                },
+              })
+            }}
+          >
+            {r.registration.description}
+          </RegistrationCard>
+        ))}
+      </CardGrid>
+    )
+  }
+)
+
+RegistrationsView.displayName = "RegistrationsView"
