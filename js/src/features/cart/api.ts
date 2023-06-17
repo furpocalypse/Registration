@@ -88,3 +88,28 @@ export const fetchAvailableCheckoutMethods = async (
     .json<CheckoutMethod[]>()
   return res
 }
+
+/**
+ * Remove a registration from a cart.
+ * @param wretch - The {@link Wretch} instance.
+ * @param cartId - The cart ID.
+ * @param registrationId - The registration ID.
+ * @returns A pair of the new cart ID and the cart object.
+ */
+export const removeRegistrationFromCart = async (
+  wretch: Wretch,
+  cartId: string,
+  registrationId: string
+): Promise<[string, Cart]> => {
+  const res = await wretch
+    .url(`/carts/${cartId}/registrations/${registrationId}`)
+    .delete()
+    .res()
+
+  const body: Cart = await res.json()
+
+  const url = new URL(res.url)
+  const pathParts = url.pathname.split("/")
+  const id = pathParts[pathParts.length - 1]
+  return [id, body]
+}

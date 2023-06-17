@@ -1,4 +1,8 @@
-import { fetchCart, fetchEmptyCart } from "#src/features/cart/api.js"
+import {
+  fetchCart,
+  fetchEmptyCart,
+  removeRegistrationFromCart,
+} from "#src/features/cart/api.js"
 import { Cart } from "#src/features/cart/types.js"
 import { getCurrentCartId, setCurrentCartId } from "#src/features/cart/utils.js"
 import { Loader, NotFoundError, createLoader } from "#src/util/loader.js"
@@ -29,6 +33,24 @@ export class CartStore {
     }
 
     return loader
+  }
+
+  async removeRegistrationFromCart(
+    cartId: string,
+    registrationId: string
+  ): Promise<[string, Cart]> {
+    const [id, cart] = await removeRegistrationFromCart(
+      this.wretch,
+      cartId,
+      registrationId
+    )
+    runInAction(() => {
+      this.loaders.set(
+        id,
+        createLoader(async () => cart)
+      )
+    })
+    return [id, cart]
   }
 }
 

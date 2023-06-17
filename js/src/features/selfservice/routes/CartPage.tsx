@@ -45,7 +45,10 @@ const CartView = observer(
       })
     }
 
-    const checkoutAvailable = !checkoutComplete
+    const checkoutAvailable =
+      !checkoutComplete &&
+      loader.checkLoaded() &&
+      loader.value.line_items.length > 0
 
     return (
       <loader.Component>
@@ -55,6 +58,14 @@ const CartView = observer(
               {result.line_items.map((li, i) => (
                 <LineItemComponent
                   key={i}
+                  onRemove={async () => {
+                    const [newId, newCart] =
+                      await currentCartStore.cartStore.removeRegistrationFromCart(
+                        cartId,
+                        li.registration_id
+                      )
+                    currentCartStore.setCurrentCart(newId, newCart)
+                  }}
                   name={li.name}
                   description={li.description}
                   price={li.price}

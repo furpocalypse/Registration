@@ -85,7 +85,7 @@ export const LineItem = (props: LineItemProps) => {
       {onRemove && (
         <Grid>
           <Grid.Col span={12}>
-            <Button variant="subtle" color="red" compact>
+            <Button variant="subtle" color="red" compact onClick={onRemove}>
               Remove
             </Button>
           </Grid.Col>
