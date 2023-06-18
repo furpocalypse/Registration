@@ -42,13 +42,35 @@ const config: StorybookConfig = {
       },
       module: {
         rules: [
+          ...(config.module?.rules ?? []),
           {
             test: /\.svg$/,
             exclude: /node_modules/,
             use: "svgo-loader",
             type: "asset/resource",
           },
-          ...(config.module?.rules ?? []),
+
+          // handle submodules
+          {
+            include: [path.resolve("./interview")],
+            use: [
+              {
+                loader: "babel-loader",
+                options: {
+                  presets: [
+                    "@babel/preset-env",
+                    [
+                      "@babel/preset-react",
+                      {
+                        runtime: "automatic",
+                      },
+                    ],
+                    "@babel/preset-typescript",
+                  ],
+                },
+              },
+            ],
+          },
         ],
       },
       resolve: {
