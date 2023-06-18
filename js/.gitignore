@@ -5,3 +5,4 @@ dist
 # theme/config files
 /theme.ts
 /config.json
+/logo.svg

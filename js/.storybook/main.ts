@@ -40,15 +40,31 @@ const config: StorybookConfig = {
         type: "filesystem",
         cacheDirectory: path.resolve("./.cache/storybook-webpack"),
       },
+      module: {
+        rules: [
+          {
+            test: /\.svg$/,
+            exclude: /node_modules/,
+            use: "svgo-loader",
+            type: "asset/resource",
+          },
+          ...(config.module?.rules ?? []),
+        ],
+      },
       resolve: {
         ...config.resolve,
         alias: {
           ...config.resolve?.alias,
 
-          // overridable theme file
           "#src/config/theme.js$": [
             path.resolve("./theme.ts"),
             path.resolve("./src/config/theme.ts"),
+          ],
+
+          // logo
+          "logo.svg$": [
+            path.resolve("./logo.svg"),
+            path.resolve("./resources/example-logo.svg"),
           ],
 
           // config.json

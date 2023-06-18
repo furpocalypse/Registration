@@ -27,7 +27,7 @@ export type RegistrationCardProps = {
   onMenuSelect?: (id: string) => void
   children?: ReactNode
 } & DefaultProps<Selectors<typeof cardStyles>> &
-  CardProps
+  Omit<CardProps, "styles">
 
 export const RegistrationCard = (props: RegistrationCardProps) => {
   const {

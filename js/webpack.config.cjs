@@ -33,6 +33,16 @@ module.exports = (env, argv) => {
             filename: "config.json",
           },
         },
+
+        // resources
+
+        // svg files -> SVGO
+        {
+          test: /\.svg$/,
+          exclude: /node_modules/,
+          use: "svgo-loader",
+          type: "asset/resource",
+        },
       ],
     },
     resolve: {
@@ -41,6 +51,12 @@ module.exports = (env, argv) => {
         "#src/config/theme.js$": [
           path.resolve("./theme.ts"),
           path.resolve("./src/config/theme.ts"),
+        ],
+
+        // logo
+        "logo.svg$": [
+          path.resolve("./logo.svg"),
+          path.resolve("./resources/example-logo.svg"),
         ],
 
         // config.json

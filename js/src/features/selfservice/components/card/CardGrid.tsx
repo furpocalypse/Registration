@@ -18,7 +18,7 @@ const gridStyles = createStyles({
 export type CardGridProps = {
   children?: ReactNode[]
 } & DefaultProps<Selectors<typeof gridStyles>> &
-  SimpleGridProps
+  Omit<SimpleGridProps, "styles">
 
 export const CardGrid = (props: CardGridProps) => {
   const { className, classNames, styles, unstyled, children, ...other } =

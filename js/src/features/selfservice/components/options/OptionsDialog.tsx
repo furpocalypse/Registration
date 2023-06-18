@@ -3,7 +3,6 @@ import {
   DefaultProps,
   LoadingOverlay,
   Modal,
-  ModalProps,
   Selectors,
   createStyles,
   useComponentDefaultProps,

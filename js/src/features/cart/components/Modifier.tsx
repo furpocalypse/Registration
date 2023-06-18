@@ -28,7 +28,7 @@ const modifierStyles = createStyles({
 export type ModifierProps = {
   name: string
   amount: number
-} & Omit<GroupProps, "children"> &
+} & Omit<GroupProps, "children" | "styles"> &
   DefaultProps<Selectors<typeof modifierStyles>>
 
 /**
