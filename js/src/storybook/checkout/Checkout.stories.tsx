@@ -8,6 +8,9 @@ import { useEffect, useState } from "react"
 
 export default {
   title: "checkout/Checkout",
+  parameters: {
+    layout: "fullscreen",
+  },
 }
 
 export const Mock = () => {

@@ -20,9 +20,11 @@ const useStyles = createStyles((theme) => ({
     paddingLeft: "1rem",
     paddingRight: "1rem",
     background: theme.fn.primaryColor(),
-    borderBottom: `${theme.fn.lighten(theme.fn.primaryColor(), 0.1)} solid 1px`,
+    borderBottom: `${theme.fn.lighten(theme.fn.primaryColor(), 0.2)} solid 1px`,
   },
-  homeIcon: {},
+  homeIcon: {
+    color: theme.white,
+  },
 }))
 
 export type HeaderProps = {
@@ -57,7 +59,7 @@ export const Header = (props: HeaderProps) => {
     <MantineHeader
       className={cx(classes.root, className)}
       height={{
-        base: 48,
+        base: "3rem",
       }}
       fixed
       {...other}

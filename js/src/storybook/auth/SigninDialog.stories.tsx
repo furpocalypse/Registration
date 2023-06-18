@@ -3,6 +3,9 @@ import { Meta, StoryFn } from "@storybook/react"
 
 export default {
   component: SigninDialog,
+  parameters: {
+    layout: "fullscreen",
+  },
 } as Meta<typeof SigninDialog>
 
 export const Default: StoryFn<typeof SigninDialog> = (args) => {

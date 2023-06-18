@@ -12,6 +12,9 @@ export default {
       { service: "system", method: "cash", name: "Cash" },
     ],
   },
+  parameters: {
+    layout: "fullscreen",
+  },
 } as Meta<typeof CheckoutMethodsDialog>
 
 export const Default: StoryFn<typeof CheckoutMethodsDialog> = (args) => {
