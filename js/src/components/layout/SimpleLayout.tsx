@@ -1,25 +1,18 @@
+import { Header } from "#src/components/layout/Header.js"
+import { TitleArea } from "#src/components/layout/TitleArea.js"
 import {
-  SubtitlePlaceholder,
-  TitlePlaceholder,
-} from "#src/components/title/Title.js"
-import {
-  ActionIcon,
   AppShell,
   AppShellProps,
+  Box,
   Container,
   ContainerProps,
   DefaultProps,
-  Header,
-  HeaderProps,
   Selectors,
   Stack,
-  Text,
-  Title,
   createStyles,
   useComponentDefaultProps,
 } from "@mantine/core"
-import { IconHome } from "@tabler/icons-react"
-import { ComponentType, ReactNode } from "react"
+import { ReactNode } from "react"
 
 const layoutStyles = createStyles((theme) => ({
   root: {
@@ -31,16 +24,10 @@ const layoutStyles = createStyles((theme) => ({
   appShellMain: {
     paddingLeft: 0,
     paddingRight: 0,
+    paddingTop: 48,
     display: "flex",
+    flexDirection: "column",
     alignItems: "stretch",
-  },
-  header: {
-    display: "flex",
-    alignItems: "center",
-    marginBottom: theme.spacing.md,
-  },
-  homeIcon: {
-    marginLeft: "1rem",
   },
   container: {
     padding: 16,
@@ -55,9 +42,6 @@ const layoutStyles = createStyles((theme) => ({
 
 export type SimpleLayoutProps = {
   children?: ReactNode
-  logo?: ComponentType<Record<string, never>> | string
-  homeUrl?: string
-  HeaderProps?: HeaderProps
   ContainerProps?: ContainerProps
 } & DefaultProps<Selectors<typeof layoutStyles>> &
   AppShellProps
@@ -69,9 +53,6 @@ export const SimpleLayout = (props: SimpleLayoutProps) => {
     styles,
     unstyled,
     children,
-    logo: Logo,
-    homeUrl,
-    HeaderProps,
     ContainerProps,
     ...other
   } = useComponentDefaultProps("SimpleLayout", {}, props)
@@ -84,44 +65,20 @@ export const SimpleLayout = (props: SimpleLayoutProps) => {
   })
 
   return (
-    <>
-      <AppShell
-        header={
-          <Header height={48} className={classes.header} {...HeaderProps}>
-            <ActionIcon
-              className={classes.homeIcon}
-              component="a"
-              href={homeUrl ?? "/"}
-              title="Home"
-            >
-              {typeof Logo === "function" ? (
-                <Logo />
-              ) : typeof Logo === "string" ? (
-                <img src={Logo} alt="" />
-              ) : (
-                <IconHome />
-              )}
-            </ActionIcon>
-          </Header>
-        }
-        className={cx(classes.root, className)}
-        classNames={{
-          main: classes.appShellMain,
-        }}
-        {...other}
-      >
+    <AppShell
+      header={<Header />}
+      className={cx(classes.root, className)}
+      classNames={{
+        main: classes.appShellMain,
+      }}
+      {...other}
+    >
+      <TitleArea />
+      <Box>
         <Container size="lg" className={classes.container} {...ContainerProps}>
-          <Stack className={classes.stack}>
-            <Title order={1}>
-              <TitlePlaceholder />
-            </Title>
-            <Text>
-              <SubtitlePlaceholder />
-            </Text>
-            {children}
-          </Stack>
+          <Stack className={classes.stack}>{children}</Stack>
         </Container>
-      </AppShell>
-    </>
+      </Box>
+    </AppShell>
   )
 }
