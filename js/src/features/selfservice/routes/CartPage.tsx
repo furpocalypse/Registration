@@ -32,6 +32,12 @@ export const CartPage = observer(() => {
   const [cart, setCart] = useState<Loader<Cart> | null>(currentCartStore.loader)
 
   useEffect(() => {
+    if (!currentCartStore.currentCartId) {
+      currentCartStore.checkAndSetCurrentCart()
+    }
+  }, [currentCartStore.currentCartId])
+
+  useEffect(() => {
     if (currentCartStore.loader && currentCartStore.currentCartId) {
       setCart(currentCartStore.loader)
       setCartId(currentCartStore.currentCartId)
