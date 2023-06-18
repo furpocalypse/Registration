@@ -41,6 +41,7 @@ module.exports = (env, argv) => {
           test: /\.svg$/,
           exclude: /node_modules/,
           use: "svgo-loader",
+          type: "asset/resource",
         },
       ],
     },

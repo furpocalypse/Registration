@@ -46,6 +46,7 @@ const config: StorybookConfig = {
             test: /\.svg$/,
             exclude: /node_modules/,
             use: "svgo-loader",
+            type: "asset/resource",
           },
           ...(config.module?.rules ?? []),
         ],
