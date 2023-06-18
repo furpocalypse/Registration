@@ -3,8 +3,10 @@
 !package-lock.json
 !src
 !interview
+!resources
 !extra
 !webpack.config.cjs
 !.babelrc.json
 !config.example.json
 !config.json
+!logo.svg
