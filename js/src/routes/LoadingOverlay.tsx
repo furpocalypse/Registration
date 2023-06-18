@@ -28,7 +28,7 @@ const LoadingContext = createContext(makeAutoObservable({ loading: 0 }))
 export type LoadingOverlayProps = {
   backgroundColor?: string
 } & DefaultProps<Selectors<typeof loadingPageStyles>> &
-  Omit<OverlayProps, "children">
+  Omit<OverlayProps, "children" | "styles">
 
 /**
  * Overlay that covers the screen while loading.

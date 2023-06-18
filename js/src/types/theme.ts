@@ -19,12 +19,14 @@ import { TitleAreaProps } from "#src/components/layout/TitleArea.js"
 import { SigninDialogProps } from "#src/features/auth/components/SigninDialog.js"
 import { CheckoutDialogProps } from "#src/features/checkout/components/checkout/CheckoutDialog.js"
 import { OptionsDialogProps } from "#src/features/selfservice/components/options/OptionsDialog.js"
+import { LogoProps } from "#src/components/layout/Logo.js"
 
 interface Components {
   // src/components
   AppShellLayout: AppShellLayoutProps
   ContainerLayout: ContainerLayoutProps
   Header: HeaderProps
+  Logo: LogoProps
   StackLayout: StackLayoutProps
   TitleArea: TitleAreaProps
 
@@ -46,7 +48,6 @@ interface Components {
 
   // src/routes
   LoadingOverlay: LoadingOverlayProps
-  LoadingPage: LoadingOverlayProps
 }
 
 interface ThemeComponentOf<Props> {
@@ -57,13 +58,9 @@ interface ThemeComponentOf<Props> {
     : Styles<string>
 }
 
-type MappedThemeComponents = {
+type ThemeComponents = {
   [C in keyof Components]?: ThemeComponentOf<Components[C]>
-}
-
-interface ThemeComponents extends MappedThemeComponents {
-  [key: string]: MantineTheme["components"][string] | undefined
-}
+} & MantineTheme["components"]
 
 export type ThemeOverride = MantineThemeOverride & {
   components?: ThemeComponents

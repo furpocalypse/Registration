@@ -13,7 +13,7 @@ const useStyles = createStyles(() => ({
   },
 }))
 
-export type StackLayoutProps = StackProps &
+export type StackLayoutProps = Omit<StackProps, "styles"> &
   DefaultProps<Selectors<typeof useStyles>>
 
 export const StackLayout = (props: StackLayoutProps) => {

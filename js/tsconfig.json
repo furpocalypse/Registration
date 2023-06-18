@@ -3,7 +3,7 @@
     "target": "ESNext",
     "jsx": "react-jsx",
     "module": "NodeNext",
-    "rootDir": "./src",
+    "rootDir": "./",
     "moduleResolution": "nodenext",
     "paths": {
       "#src/*": ["./src/*"]
@@ -15,9 +15,13 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["./src/**/*"],
+  "include": ["./src/**/*", "./theme.ts"],
   "references": [
-    { "path": "./interview/js/lib" },
-    { "path": "./interview/js/components" }
+    {
+      "path": "./interview/js/lib"
+    },
+    {
+      "path": "./interview/js/components"
+    }
   ]
 }

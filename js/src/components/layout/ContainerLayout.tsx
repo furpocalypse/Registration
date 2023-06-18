@@ -16,7 +16,7 @@ const useStyles = createStyles(() => ({
   },
 }))
 
-export type ContainerLayoutProps = ContainerProps &
+export type ContainerLayoutProps = Omit<ContainerProps, "styles"> &
   DefaultProps<Selectors<typeof useStyles>>
 
 export const ContainerLayout = (props: ContainerLayoutProps) => {

@@ -32,7 +32,7 @@ export type HeaderProps = {
   homeIcon?: ComponentType<Record<string, never>> | string
   ActionIconProps?: ActionIconProps
   children?: ReactNode
-} & Omit<MantineHeaderProps, "height" | "children"> &
+} & Omit<MantineHeaderProps, "height" | "children" | "styles"> &
   DefaultProps<Selectors<typeof useStyles>>
 
 export const Header = (props: HeaderProps) => {

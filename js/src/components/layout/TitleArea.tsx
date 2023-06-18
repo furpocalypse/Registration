@@ -1,3 +1,4 @@
+import { Logo, LogoProps } from "#src/components/layout/Logo.js"
 import {
   SubtitlePlaceholder,
   TitlePlaceholder,
@@ -27,16 +28,33 @@ const useStyles = createStyles((theme) => ({
   },
   container: {
     flex: "auto",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    paddingTop: "1rem",
+    paddingBottom: "1rem",
   },
-  title: {},
-  subtitle: {},
+  logo: {
+    flex: "0 0 0",
+    marginBottom: "2rem",
+  },
+  title: {
+    fontSize: "1.25rem",
+    lineHeight: "2rem",
+  },
+  subtitle: {
+    fontSize: "1rem",
+    lineHeight: "1.5rem",
+  },
 }))
 
 export type TitleAreaProps = {
+  noLogo?: boolean
+  LogoProps?: LogoProps
   TitleProps?: TitleProps
   SubtitleProps?: TextProps
   ContainerProps?: ContainerProps
-} & BoxProps &
+} & Omit<BoxProps, "styles"> &
   DefaultProps<Selectors<typeof useStyles>>
 
 export const TitleArea = (props: TitleAreaProps) => {
@@ -45,6 +63,8 @@ export const TitleArea = (props: TitleAreaProps) => {
     classNames,
     styles,
     unstyled,
+    noLogo,
+    LogoProps,
     TitleProps,
     SubtitleProps,
     ContainerProps,
@@ -61,6 +81,7 @@ export const TitleArea = (props: TitleAreaProps) => {
   return (
     <Box className={cx(classes.root, className)} {...other}>
       <Container className={classes.container} size="lg" {...ContainerProps}>
+        {!noLogo && <Logo classNames={{ root: classes.logo }} {...LogoProps} />}
         <Title order={1} className={classes.title} {...TitleProps}>
           <TitlePlaceholder />
         </Title>

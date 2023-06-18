@@ -1,5 +1,5 @@
 import { Header } from "#src/components/layout/Header.js"
-import { TitleArea } from "#src/components/layout/TitleArea.js"
+import { TitleArea, TitleAreaProps } from "#src/components/layout/TitleArea.js"
 import {
   AppShell,
   AppShellProps,
@@ -9,6 +9,7 @@ import {
   createStyles,
   useComponentDefaultProps,
 } from "@mantine/core"
+import { ReactNode } from "react"
 
 const useStyles = createStyles(() => ({
   root: {
@@ -28,12 +29,22 @@ const useStyles = createStyles(() => ({
   content: {},
 }))
 
-export type AppShellLayoutProps = DefaultProps<Selectors<typeof useStyles>> &
-  AppShellProps
+export type AppShellLayoutProps = {
+  children?: ReactNode
+  TitleAreaProps?: TitleAreaProps
+} & DefaultProps<Selectors<typeof useStyles>> &
+  Omit<AppShellProps, "children" | "styles">
 
 export const AppShellLayout = (props: AppShellLayoutProps) => {
-  const { className, classNames, styles, unstyled, children, ...other } =
-    useComponentDefaultProps("AppShellLayout", {}, props)
+  const {
+    className,
+    classNames,
+    styles,
+    unstyled,
+    children,
+    TitleAreaProps,
+    ...other
+  } = useComponentDefaultProps("AppShellLayout", {}, props)
 
   const { classes, cx } = useStyles(undefined, {
     name: "AppShellLayout",
@@ -51,7 +62,7 @@ export const AppShellLayout = (props: AppShellLayoutProps) => {
       }}
       {...other}
     >
-      <TitleArea />
+      <TitleArea {...TitleAreaProps} />
       <Box className={classes.content}>{children}</Box>
     </AppShell>
   )
