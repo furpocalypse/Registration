@@ -1,6 +1,9 @@
 import { Title as PageTitle, Subtitle } from "#src/components/title/Title.js"
 import { useParams } from "react-router-dom"
-import { CardGrid } from "#src/features/selfservice/components/card/CardGrid.js"
+import {
+  CardGrid,
+  NoRegistrationsMessage,
+} from "#src/features/selfservice/components/card/CardGrid.js"
 import { Anchor, Box, Button, Grid } from "@mantine/core"
 import { IconPlus } from "@tabler/icons-react"
 import {
@@ -94,7 +97,7 @@ export const EventPage = () => {
                         Add Registration
                       </Button>
                     </Grid.Col>
-                    {currentCartStore.loader?.value?.registrations.length && (
+                    {currentCartStore.loader?.value?.registrations.length ? (
                       <Grid.Col span="content">
                         <Anchor
                           component={RLink}
@@ -104,7 +107,7 @@ export const EventPage = () => {
                           {currentCartStore.loader.value.registrations.length})
                         </Anchor>
                       </Grid.Col>
-                    )}
+                    ) : null}
                   </Grid>
                 )}
                 <OptionsDialogManager
@@ -158,54 +161,66 @@ const RegistrationsView = observer(
     const wretch = useWretch()
     const interviewState = useInterviewState()
 
-    return (
-      <CardGrid sx={{ minHeight: 200 }}>
-        {registrations.map((r) => (
-          <RegistrationCard
-            key={r.registration.id}
-            title={r.registration.title}
-            subtitle={r.registration.subtitle}
-            menuOptions={r.change_options.map((o) => ({
-              id: o.id,
-              label: o.name,
-            }))}
-            onMenuSelect={async (id) => {
-              let cartId = getCurrentCartId()
-              if (!cartId) {
-                const [curOrEmptyCartId] = await fetchCurrentOrEmptyCart(
-                  wretch,
-                  event.id
-                )
-                cartId = curOrEmptyCartId
-              }
+    if (registrations.length == 0) {
+      return (
+        <NoRegistrationsMessage
+          sx={{
+            minHeight: 200,
+            display: "flex",
+            alignItems: "center",
+          }}
+        />
+      )
+    } else {
+      return (
+        <CardGrid sx={{ minHeight: 200 }}>
+          {registrations.map((r) => (
+            <RegistrationCard
+              key={r.registration.id}
+              title={r.registration.title}
+              subtitle={r.registration.subtitle}
+              menuOptions={r.change_options.map((o) => ({
+                id: o.id,
+                label: o.name,
+              }))}
+              onMenuSelect={async (id) => {
+                let cartId = getCurrentCartId()
+                if (!cartId) {
+                  const [curOrEmptyCartId] = await fetchCurrentOrEmptyCart(
+                    wretch,
+                    event.id
+                  )
+                  cartId = curOrEmptyCartId
+                }
 
-              const state = await fetchCartInterview(
-                wretch,
-                cartId,
-                id,
-                r.registration.id
-              )
-              const next = await interviewState.startInterview(state, {
-                cartId: cartId,
-                eventId: event.id,
-              })
-              // show dialog
-              navigate(loc, {
-                state: {
-                  ...loc.state,
-                  showInterviewDialog: {
-                    eventId: event.id,
-                    recordId: next.id,
+                const state = await fetchCartInterview(
+                  wretch,
+                  cartId,
+                  id,
+                  r.registration.id
+                )
+                const next = await interviewState.startInterview(state, {
+                  cartId: cartId,
+                  eventId: event.id,
+                })
+                // show dialog
+                navigate(loc, {
+                  state: {
+                    ...loc.state,
+                    showInterviewDialog: {
+                      eventId: event.id,
+                      recordId: next.id,
+                    },
                   },
-                },
-              })
-            }}
-          >
-            {r.registration.description}
-          </RegistrationCard>
-        ))}
-      </CardGrid>
-    )
+                })
+              }}
+            >
+              {r.registration.description}
+            </RegistrationCard>
+          ))}
+        </CardGrid>
+      )
+    }
   }
 )
 

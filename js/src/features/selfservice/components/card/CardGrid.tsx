@@ -3,8 +3,8 @@ import {
   Group,
   Selectors,
   SimpleGrid,
-  SimpleGridProps,
   Text,
+  TextProps,
   createStyles,
   useComponentDefaultProps,
 } from "@mantine/core"
@@ -17,8 +17,7 @@ const gridStyles = createStyles({
 
 export type CardGridProps = {
   children?: ReactNode[]
-} & DefaultProps<Selectors<typeof gridStyles>> &
-  Omit<SimpleGridProps, "styles">
+} & DefaultProps<Selectors<typeof gridStyles>>
 
 export const CardGrid = (props: CardGridProps) => {
   const { className, classNames, styles, unstyled, children, ...other } =
@@ -47,18 +46,18 @@ export const CardGrid = (props: CardGridProps) => {
       }
       {...other}
     >
-      {children.length > 0 ? (
-        children
-      ) : (
-        <Text color="dimmed">
-          <Group align="center">
-            <IconAlertCircle />
-            <Text span inline>
-              You have no registrations for this event.
-            </Text>
-          </Group>
-        </Text>
-      )}
+      {children}
     </SimpleGrid>
   )
 }
+
+export const NoRegistrationsMessage = (props: TextProps) => (
+  <Text color="dimmed" {...props}>
+    <Group align="center">
+      <IconAlertCircle />
+      <Text span inline>
+        You have no registrations for this event.
+      </Text>
+    </Group>
+  </Text>
+)

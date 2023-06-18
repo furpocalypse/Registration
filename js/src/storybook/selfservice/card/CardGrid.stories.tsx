@@ -30,7 +30,3 @@ export const Default: StoryFn<typeof CardGrid> = () => {
     </CardGrid>
   )
 }
-
-export const Empty: StoryFn<typeof CardGrid> = () => {
-  return <CardGrid></CardGrid>
-}
