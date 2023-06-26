@@ -1,7 +1,7 @@
 import { Wretch } from "wretch"
 import { queryStringAddon } from "wretch/addons"
 import { Cart, PricingResult } from "#src/features/cart/types.js"
-import { InterviewStateResponse } from "@oes/interview-lib"
+import { InterviewStateResponse } from "@open-event-systems/interview-lib"
 import { CheckoutMethod } from "#src/features/checkout/types/Checkout.js"
 
 /**

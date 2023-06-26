@@ -1,7 +1,5 @@
 FROM node:20.1.0-alpine3.17 AS node
 WORKDIR /build
-# TODO: remove these when they are no longer submodules...
-COPY interview/ interview/
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY .babelrc.json webpack.config.cjs config.example.json ./

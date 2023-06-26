@@ -69,10 +69,7 @@ services:
         target: /config/events.yml
 
   interview:
-    build:
-      # It's already cloned in the js dir, no need to clone it again.
-      # Eventually this should be a hosted container.
-      context: ../js/interview/python
+    image: ghcr.io/open-event-systems/interview-server:latest
     command:
       ["--host", "0.0.0.0", "--port", "8000", "--root-path", "/api/interview"]
     networks:

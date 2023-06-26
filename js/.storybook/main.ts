@@ -18,21 +18,6 @@ const config: StorybookConfig = {
   docs: {
     autodocs: "tag",
   },
-  babel: () => {
-    return {
-      presets: [
-        "@babel/preset-env",
-        [
-          "@babel/preset-react",
-          {
-            runtime: "automatic",
-          },
-        ],
-        "@babel/preset-typescript",
-      ],
-      plugins: ["@babel/plugin-transform-runtime"],
-    }
-  },
   webpackFinal: (config) => {
     return {
       ...config,
@@ -48,28 +33,6 @@ const config: StorybookConfig = {
             exclude: /node_modules/,
             use: "svgo-loader",
             type: "asset/resource",
-          },
-
-          // handle submodules
-          {
-            include: [path.resolve("./interview")],
-            use: [
-              {
-                loader: "babel-loader",
-                options: {
-                  presets: [
-                    "@babel/preset-env",
-                    [
-                      "@babel/preset-react",
-                      {
-                        runtime: "automatic",
-                      },
-                    ],
-                    "@babel/preset-typescript",
-                  ],
-                },
-              },
-            ],
           },
         ],
       },

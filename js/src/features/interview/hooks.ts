@@ -1,5 +1,5 @@
 import { placeholderWretch } from "#src/config/api.js"
-import { InterviewStateStore } from "@oes/interview-lib"
+import { InterviewStateStore } from "@open-event-systems/interview-lib"
 import { createContext, useContext } from "react"
 
 export const InterviewStateStoreContext = createContext(

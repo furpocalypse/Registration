@@ -2,8 +2,8 @@ import { useLocation, useNavigate } from "#src/hooks/location.js"
 import {
   CompleteInterviewStateResponse,
   InterviewStateMetadata,
-} from "@oes/interview-lib"
-import { InterviewDialog } from "@oes/interview-components/components/interview/InterviewDialog.js"
+} from "@open-event-systems/interview-lib"
+import { InterviewDialog } from "@open-event-systems/interview-components/components/interview/InterviewDialog.js"
 import { observer } from "mobx-react-lite"
 import { useInterviewState } from "#src/features/interview/hooks.js"
 

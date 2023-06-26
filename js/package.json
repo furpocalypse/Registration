@@ -1,5 +1,5 @@
 {
-  "name": "@oes/registration",
+  "name": "@open-event-systems/registration",
   "version": "0.1.0",
   "description": "OES registration web interface",
   "type": "module",
@@ -59,8 +59,8 @@
     "@emotion/react": "^11.10.6",
     "@mantine/core": "^6.0.7",
     "@mantine/hooks": "^6.0.7",
-    "@oes/interview-components": "file:./interview/js/components",
-    "@oes/interview-lib": "file:./interview/js/lib",
+    "@open-event-systems/interview-components": "^0.1.0",
+    "@open-event-systems/interview-lib": "^0.1.0",
     "@simplewebauthn/browser": "^7.2.0",
     "@stripe/stripe-js": "^1.52.1",
     "@tabler/icons-react": "^2.16.0",

@@ -1,6 +1,6 @@
 import { InterviewStateStoreContext } from "#src/features/interview/hooks.js"
 import { useWretch } from "#src/hooks/api.js"
-import { InterviewStateStore } from "@oes/interview-lib"
+import { InterviewStateStore } from "@open-event-systems/interview-lib"
 import { ReactNode, useEffect, useState } from "react"
 
 export const InterviewStateStoreProvider = ({

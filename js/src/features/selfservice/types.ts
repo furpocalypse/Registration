@@ -20,7 +20,7 @@ export interface SelfServiceRegistrationListResponse {
   add_options: InterviewOption[]
 }
 
-declare module "@oes/interview-lib" {
+declare module "@open-event-systems/interview-lib" {
   interface InterviewStateMetadata {
     eventId?: string
     cartId?: string

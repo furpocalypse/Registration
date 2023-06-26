@@ -25,28 +25,6 @@ module.exports = (env, argv) => {
           use: "babel-loader",
         },
 
-        // handle submodules
-        {
-          include: [path.resolve("./interview")],
-          use: [
-            {
-              loader: "babel-loader",
-              options: {
-                presets: [
-                  "@babel/preset-env",
-                  [
-                    "@babel/preset-react",
-                    {
-                      runtime: "automatic",
-                    },
-                  ],
-                  "@babel/preset-typescript",
-                ],
-              },
-            },
-          ],
-        },
-
         // config.json
         {
           test: /config(\.example)?\.json$/,
