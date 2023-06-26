@@ -53,11 +53,17 @@ services:
   server:
     build:
       context: ../server
+    entrypoint: /bin/sh
     command:
-      - --bind=0.0.0.0
-      - --root-path=/api
-      - --config=/config/config.yml
-      - --events=/config/events.yml
+      - -c
+      - |
+        sleep 3  # hack to work around pg init not being finished yet
+        alembic upgrade head
+        exec oes-registration \
+          --bind 0.0.0.0 \
+          --root-path /api \
+          --config /config/config.yml \
+          --events /config/events.yml
     networks:
       - server
     depends_on:
