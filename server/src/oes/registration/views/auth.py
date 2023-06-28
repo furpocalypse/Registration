@@ -8,19 +8,16 @@ from blacksheep.exceptions import Forbidden
 from blacksheep.server.openapi.common import ResponseInfo
 from loguru import logger
 from oes.registration.app import app
-from oes.registration.database import transaction
-from oes.registration.docs import docs, docs_helper, serialize
-from oes.registration.models.auth import AccessToken, TokenResponse, User, join_scope
-from oes.registration.models.config import Config
-from oes.registration.services.auth import (
+from oes.registration.auth.models import AccessToken, TokenResponse, User, join_scope
+from oes.registration.auth.service import (
     AuthorizationError,
     AuthService,
     create_new_account,
 )
-from oes.registration.services.auth import (
+from oes.registration.auth.service import (
     create_webauthn_registration as _create_webauthn_registration,
 )
-from oes.registration.services.auth import (
+from oes.registration.auth.service import (
     get_refresh_token_by_str,
     get_webauthn_authentication_challenge,
     get_webauthn_registration_challenge,
@@ -28,6 +25,9 @@ from oes.registration.services.auth import (
     verify_webauthn_authentication_response,
     verify_webauthn_registration_response,
 )
+from oes.registration.database import transaction
+from oes.registration.docs import docs, docs_helper, serialize
+from oes.registration.models.config import Config
 from oes.registration.util import get_now
 from oes.registration.views.parameters import AttrsBody
 from sqlalchemy.ext.asyncio import AsyncSession

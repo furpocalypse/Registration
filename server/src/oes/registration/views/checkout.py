@@ -15,12 +15,13 @@ from blacksheep.exceptions import NotFound
 from blacksheep.server.openapi.common import ContentInfo, ResponseInfo
 from loguru import logger
 from oes.registration.app import app
-from oes.registration.auth import RequireCart
+from oes.registration.auth.handlers import RequireCart
+from oes.registration.auth.models import User
+from oes.registration.auth.service import AuthService
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState
 from oes.registration.hook.service import HookSender
-from oes.registration.models.auth import User
 from oes.registration.models.cart import CartData
 from oes.registration.models.config import Config
 from oes.registration.models.event import EventConfig
@@ -32,7 +33,6 @@ from oes.registration.payment.base import (
     ValidationError,
 )
 from oes.registration.serialization import get_converter
-from oes.registration.services.auth import AuthService
 from oes.registration.services.cart import (
     CartService,
     price_cart,

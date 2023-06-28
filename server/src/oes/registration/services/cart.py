@@ -4,6 +4,7 @@ from inspect import iscoroutinefunction
 from typing import Optional
 from uuid import UUID
 
+from oes.registration.auth.service import AuthService
 from oes.registration.entities.cart import CartEntity
 from oes.registration.entities.registration import RegistrationEntity
 from oes.registration.hook.models import HookConfig, HookEvent
@@ -18,7 +19,6 @@ from oes.registration.models.pricing import (
 )
 from oes.registration.pricing import default_pricing
 from oes.registration.serialization import get_converter
-from oes.registration.services.auth import AuthService
 from oes.registration.services.registration import (
     RegistrationService,
     add_account_to_registration,

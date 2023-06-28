@@ -11,7 +11,7 @@ from blacksheep.server.openapi.common import (
     ResponseInfo,
 )
 from oes.registration.app import app
-from oes.registration.auth import RequireAdmin
+from oes.registration.auth.handlers import RequireAdmin
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.registration import RegistrationEntity

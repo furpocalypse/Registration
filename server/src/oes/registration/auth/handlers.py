@@ -11,8 +11,8 @@ from guardpost.asynchronous.authentication import AuthenticationHandler
 from guardpost.authorization import AuthorizationContext
 from guardpost.synchronous.authorization import Requirement
 from jwt import InvalidTokenError
+from oes.registration.auth.models import AccessToken, Scope, Scopes, User
 from oes.registration.config import CommandLineConfig
-from oes.registration.models.auth import AccessToken, Scope, Scopes, User
 from oes.registration.models.config import Config
 
 

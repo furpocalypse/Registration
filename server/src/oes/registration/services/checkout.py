@@ -5,6 +5,7 @@ import itertools
 from typing import Any, Optional, Union, overload
 from uuid import UUID
 
+from oes.registration.auth.service import AuthService
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState
 from oes.registration.entities.registration import RegistrationEntity
 from oes.registration.hook.models import HookEvent
@@ -23,7 +24,6 @@ from oes.registration.payment.base import (
     UpdateRequest,
 )
 from oes.registration.payment.config import PaymentServices
-from oes.registration.services.auth import AuthService
 from oes.registration.services.cart import apply_changes
 from oes.registration.services.registration import RegistrationService
 from oes.registration.util import get_now

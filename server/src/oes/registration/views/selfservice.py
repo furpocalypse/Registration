@@ -3,9 +3,9 @@ from typing import Optional
 
 from blacksheep import FromQuery, auth
 from oes.registration.app import app
-from oes.registration.auth import RequireSelfService
+from oes.registration.auth.handlers import RequireSelfService
+from oes.registration.auth.models import User
 from oes.registration.docs import docs_helper
-from oes.registration.models.auth import User
 from oes.registration.models.event import EventConfig
 from oes.registration.services.registration import (
     RegistrationService,

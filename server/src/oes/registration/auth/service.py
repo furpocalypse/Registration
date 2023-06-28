@@ -13,8 +13,8 @@ from blacksheep import URL, Request
 from blacksheep.exceptions import Unauthorized
 from jwt import InvalidTokenError
 from loguru import logger
-from oes.registration.entities.auth import AccountEntity, CredentialEntity
-from oes.registration.models.auth import (
+from oes.registration.auth.entities import AccountEntity, CredentialEntity
+from oes.registration.auth.models import (
     DEFAULT_SCOPES,
     AccessToken,
     CredentialType,
@@ -23,8 +23,8 @@ from oes.registration.models.auth import (
     WebAuthnAuthenticationChallenge,
     WebAuthnRegistrationChallenge,
 )
-from oes.registration.models.auth import converter as token_converter
-from oes.registration.models.auth import join_scope
+from oes.registration.auth.models import converter as token_converter
+from oes.registration.auth.models import join_scope
 from oes.registration.models.config import Config
 from oes.registration.util import get_now, unpadded_urlsafe_b64decode
 from sqlalchemy.ext.asyncio import AsyncSession

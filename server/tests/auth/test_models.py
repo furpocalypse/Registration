@@ -2,7 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 from jwt import InvalidTokenError
-from oes.registration.models.auth import (
+from oes.registration.auth.models import (
     AUDIENCE,
     ISSUER,
     AccessToken,

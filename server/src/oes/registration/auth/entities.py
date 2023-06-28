@@ -5,13 +5,13 @@ from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
 from blacksheep.messages import datetime
+from oes.registration.auth.models import CredentialType
 from oes.registration.entities.base import (
     DEFAULT_CASCADE_DELETE_ORPHAN,
     PKUUID,
     Base,
     JSONData,
 )
-from oes.registration.models.auth import CredentialType
 from sqlalchemy import ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 

@@ -12,13 +12,14 @@ from blacksheep.server.remotes.forwarding import XForwardedHeadersMiddleware
 from guardpost import Policy
 from guardpost.common import AuthenticatedRequirement
 from loguru import logger
-from oes.registration.auth import (
+from oes.registration.auth.handlers import (
     TokenAuthHandler,
     require_admin,
     require_cart,
     require_event,
     require_self_service,
 )
+from oes.registration.auth.service import AuthService
 from oes.registration.config import CommandLineConfig, load_config, load_event_config
 from oes.registration.database import (
     DBConfig,
@@ -39,7 +40,6 @@ from oes.registration.payment.config import load_services
 from oes.registration.serialization import get_converter
 from oes.registration.serialization.json import json_dumps, json_loads
 from oes.registration.services.access_code import AccessCodeService
-from oes.registration.services.auth import AuthService
 from oes.registration.services.cart import CartService
 from oes.registration.services.checkout import CheckoutService
 from oes.registration.services.event import EventService
