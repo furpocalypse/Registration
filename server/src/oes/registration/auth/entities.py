@@ -12,11 +12,13 @@ from oes.registration.entities.base import (
     Base,
     JSONData,
 )
-from sqlalchemy import ForeignKey, String
+from sqlalchemy import ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 CREDENTIAL_TYPE_LEN = 32
 CREDENTIAL_ID_MAX_LEN = 1024
+EMAIL_MAX_LEN = 254
+AUTH_CODE_MAX_LEN = 12
 
 if TYPE_CHECKING:
     from oes.registration.entities.registration import RegistrationEntity
@@ -93,3 +95,32 @@ class CredentialEntity(Base):
 
     account: Mapped[AccountEntity] = relationship(back_populates="credentials")
     """The :class:`AccountEntity` the credential is for."""
+
+
+class EmailAuthCodeEntity(Base):
+    """Entity for email auth codes."""
+
+    __tablename__ = "email_auth"
+
+    __table_args__ = (
+        Index(
+            "uq_email_auth_lower_email",
+            func.lower("email"),
+            unique=True,
+        ),
+    )
+
+    email: Mapped[str] = mapped_column(String(EMAIL_MAX_LEN), primary_key=True)
+    """The email address."""
+
+    date_created: Mapped[datetime]
+    """The date the auth code was created."""
+
+    date_expires: Mapped[datetime]
+    """The date the auth code expires."""
+
+    attempts: Mapped[int]
+    """Number of attempts."""
+
+    code: Mapped[Optional[str]] = mapped_column(String(AUTH_CODE_MAX_LEN))
+    """The auth code."""

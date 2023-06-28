@@ -64,6 +64,7 @@ class Base(DeclarativeBase):
 
 def import_entities():
     """Import all modules that contain entities."""
+    import oes.registration.auth.entities  # noqa
     from oes.registration.entities import access_code  # noqa
     from oes.registration.entities import cart  # noqa
     from oes.registration.entities import checkout  # noqa
