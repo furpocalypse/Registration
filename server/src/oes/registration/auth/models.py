@@ -250,6 +250,18 @@ class User(Identity):
 
 
 @frozen
+class EmailAuthCodeHookBody:
+    """Email auth code event data."""
+
+    email: str
+    code: str
+    num_sent: int
+    attempts: int
+    date_created: datetime
+    date_expires: datetime
+
+
+@frozen
 class WebAuthnRegistrationChallenge(TokenBase):
     """Signed WebAuthn registration challenge."""
 

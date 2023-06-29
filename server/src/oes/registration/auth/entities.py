@@ -1,6 +1,8 @@
 """Auth entities."""
 from __future__ import annotations
 
+import secrets
+from datetime import timedelta
 from typing import TYPE_CHECKING, Optional
 from uuid import UUID
 
@@ -12,16 +14,23 @@ from oes.registration.entities.base import (
     Base,
     JSONData,
 )
+from oes.registration.util import get_now
 from sqlalchemy import ForeignKey, Index, String, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 CREDENTIAL_TYPE_LEN = 32
 CREDENTIAL_ID_MAX_LEN = 1024
 EMAIL_MAX_LEN = 254
+AUTH_CODE_LEN = 6
 AUTH_CODE_MAX_LEN = 12
+AUTH_CODE_MAX_NUM_SENT = 10
+AUTH_CODE_MAX_ATTEMPTS = 10
+AUTH_CODE_EXPIRATION_SEC = 1800
 
 if TYPE_CHECKING:
     from oes.registration.entities.registration import RegistrationEntity
+
+_digits = "0123456789"
 
 
 class AccountEntity(Base):
@@ -119,8 +128,62 @@ class EmailAuthCodeEntity(Base):
     date_expires: Mapped[datetime]
     """The date the auth code expires."""
 
+    num_sent: Mapped[int]
+    """The number of sent codes."""
+
     attempts: Mapped[int]
     """Number of attempts."""
 
     code: Mapped[Optional[str]] = mapped_column(String(AUTH_CODE_MAX_LEN))
     """The auth code."""
+
+    def get_is_expired(self, *, now: Optional[datetime] = None) -> bool:
+        """Return whether the code is expired."""
+        now = now if now is not None else get_now()
+        return now >= self.date_expires
+
+    def get_is_usable(self, *, now: Optional[datetime] = None) -> bool:
+        """Checks that the code is not expired and the max attempts not exceeded."""
+        return self.attempts < AUTH_CODE_MAX_ATTEMPTS and not self.get_is_expired(
+            now=now
+        )
+
+    @property
+    def can_send(self) -> bool:
+        """Whether a code can be sent."""
+        return (
+            self.num_sent < AUTH_CODE_MAX_NUM_SENT
+            and self.attempts < AUTH_CODE_MAX_ATTEMPTS
+        )
+
+    def set_code(self, *, now: Optional[datetime] = None) -> Optional[str]:
+        """Create and set a code for this entity.
+
+        Sets the code, created/expiration date, and increments the number of codes.
+
+        Args:
+            now: The current time.
+
+        Returns:
+            The new code, or ``None`` if the number of attempts were exceeded.
+        """
+        if not self.can_send:
+            return None
+        self.code = self.generate_code()
+        now = now if now is not None else get_now()
+        self.date_created = now
+        self.date_expires = now + timedelta(seconds=AUTH_CODE_EXPIRATION_SEC)
+        self.num_sent += 1
+        return self.code
+
+    def validate(self, code: str, *, now: Optional[datetime] = None) -> bool:
+        """Return whether a code is valid."""
+        return self.get_is_usable(now=now) and self.code and code == self.code
+
+    @classmethod
+    def generate_code(cls) -> str:
+        """Generate an auth code."""
+        return "".join(secrets.choice(_digits) for _ in range(AUTH_CODE_LEN))
+
+
+import oes.registration.entities.registration  # noqa
