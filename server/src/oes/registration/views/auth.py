@@ -3,16 +3,17 @@ from typing import Optional
 from uuid import UUID
 
 from attrs import frozen
-from blacksheep import FromForm, FromQuery, HTTPException, Request, allow_anonymous
+from blacksheep import FromForm, FromQuery, HTTPException, Request, allow_anonymous, Response
 from blacksheep.exceptions import Forbidden
 from blacksheep.server.openapi.common import ResponseInfo
 from loguru import logger
 from oes.registration.app import app
-from oes.registration.auth.models import AccessToken, TokenResponse, User, join_scope
+from oes.registration.auth.email_auth_service import EmailAuthService, send_auth_code
+from oes.registration.auth.models import AccessToken, TokenResponse, User, join_scope, DEFAULT_SCOPES
 from oes.registration.auth.service import (
     AuthorizationError,
     AuthService,
-    create_new_account,
+    create_new_account, create_new_refresh_token, create_access_token_from_refresh_token,
 )
 from oes.registration.auth.service import (
     create_webauthn_registration as _create_webauthn_registration,
@@ -51,6 +52,19 @@ class CurrentAuthInfoResponse:
 
 
 @frozen
+class EmailAuthRequest:
+    """Request to send an email auth code."""
+    email: str
+
+
+@frozen
+class EmailAuthCodeRequest:
+    """Request with the received code."""
+    email: str
+    code: str
+
+
+@frozen
 class WebAuthChallengeResponse:
     """A WebAuthn challenge."""
 
@@ -82,7 +96,7 @@ class WebAuthnAuthenticationRequest:
     tags=["Auth"],
 )
 async def get_current_auth_info(
-    user: Optional[User],
+        user: Optional[User],
 ) -> CurrentAuthInfoResponse:
     """Get the current authentication information."""
     if user is None:
@@ -105,12 +119,90 @@ async def get_current_auth_info(
 )
 @transaction
 async def get_new_account(
-    service: AuthService,
-    config: Config,
+        service: AuthService,
+        config: Config,
 ) -> TokenResponse:
     """Get a new account."""
     token_response = await create_new_account(service, config)
     return token_response
+
+
+@app.router.post("/auth/email/send")
+@docs(
+    responses={
+        204: ResponseInfo("The code was sent")
+    },
+    tags=["Auth"]
+)
+@transaction
+async def create_email_auth(
+        service: EmailAuthService,
+        config: Config,
+        body: AttrsBody[EmailAuthRequest],
+) -> Response:
+    """Create/send an email auth code."""
+    await send_auth_code(service, config.hooks, body.value.email.strip())
+    return Response(204)
+
+@app.router.post("/auth/email/complete")
+@docs(
+    responses={
+        200: ResponseInfo("The token"),
+    },
+    tags=["Auth"]
+)
+@serialize(TokenResponse)
+@transaction
+async def complete_email_auth(
+        db: AsyncSession,
+        service: EmailAuthService,
+        auth_service: AuthService,
+        user: User,
+        config: Config,
+        body: AttrsBody[EmailAuthCodeRequest],
+) -> TokenResponse:
+    res = await service.get_auth_code_for_email(body.value.email.strip())
+    account = await auth_service.get_account(user.id, lock=True, with_credentials=True)
+
+    # better error code?
+    if not res or not account:
+        raise HTTPException(409)
+    elif not res.validate(body.value.code):
+        res.attempts += 1
+        await db.commit()
+        raise HTTPException(409)
+
+    # TODO: move business logic
+
+    account.revoke_refresh_tokens()
+    account.email = res.email
+
+    now = get_now()
+
+    refresh_token_str, refresh_token = await create_new_refresh_token(
+        auth_service,
+        config,
+        account,
+        scopes=DEFAULT_SCOPES,
+    )
+
+    access_token_str, access_token = create_access_token_from_refresh_token(
+        config,
+        account,
+        refresh_token,
+    )
+
+    response = TokenResponse(
+        access_token=access_token_str,
+        expires_in=int((access_token.exp - now).total_seconds()),
+        refresh_token=refresh_token_str,
+        scope=join_scope(access_token.scope),
+    )
+
+    await service.delete_code(res)
+
+    await db.commit()
+    return response
 
 
 @allow_anonymous()
@@ -121,10 +213,10 @@ async def get_new_account(
     tags=["Auth"],
 )
 async def get_token(
-    body: FromForm[TokenRequest],
-    service: AuthService,
-    config: Config,
-    db: AsyncSession,
+        body: FromForm[TokenRequest],
+        service: AuthService,
+        config: Config,
+        db: AsyncSession,
 ) -> TokenResponse:
     """Get an access token."""
     if body.value.grant_type == "refresh_token":
@@ -137,10 +229,10 @@ async def get_token(
 
 
 async def _handle_refresh_token(
-    service: AuthService,
-    config: Config,
-    db: AsyncSession,
-    refresh_token: str,
+        service: AuthService,
+        config: Config,
+        db: AsyncSession,
+        refresh_token: str,
 ):
     result = await get_refresh_token_by_str(service, config, refresh_token, lock=True)
     if not result:
@@ -192,10 +284,10 @@ async def _handle_refresh_token(
 @serialize(WebAuthChallengeResponse)
 @transaction
 async def get_webauthn_challenge(
-    request: Request,
-    service: AuthService,
-    config: Config,
-    user: User,
+        request: Request,
+        service: AuthService,
+        config: Config,
+        user: User,
 ) -> WebAuthChallengeResponse:
     """Get a WebAuthn registration challenge."""
     account = await service.get_account(user.id, lock=True, with_credentials=True)
@@ -229,11 +321,11 @@ async def get_webauthn_challenge(
 @serialize(TokenResponse)
 @transaction
 async def create_webauthn_registration(
-    request: Request,
-    body: AttrsBody[CreateWebAuthnRegistrationRequest],
-    service: AuthService,
-    config: Config,
-    user: User,
+        request: Request,
+        body: AttrsBody[CreateWebAuthnRegistrationRequest],
+        service: AuthService,
+        config: Config,
+        user: User,
 ) -> TokenResponse:
     """Create a WebAuthn registration."""
     origin = _get_origin(request)
@@ -276,10 +368,10 @@ async def create_webauthn_registration(
 )
 @serialize(WebAuthChallengeResponse)
 async def get_webauthn_auth_challenge(
-    request: Request,
-    credential_id: FromQuery[str],
-    service: AuthService,
-    config: Config,
+        request: Request,
+        credential_id: FromQuery[str],
+        service: AuthService,
+        config: Config,
 ) -> WebAuthChallengeResponse:
     """Get a WebAuthn authentication challenge."""
     origin = _get_origin(request)
@@ -309,10 +401,10 @@ async def get_webauthn_auth_challenge(
 )
 @serialize(TokenResponse)
 async def complete_webauthn_auth_challenge(
-    request: Request,
-    body: AttrsBody[WebAuthnAuthenticationRequest],
-    service: AuthService,
-    config: Config,
+        request: Request,
+        body: AttrsBody[WebAuthnAuthenticationRequest],
+        service: AuthService,
+        config: Config,
 ) -> TokenResponse:
     """Complete WebAuthn authentication."""
     origin = _get_origin(request)
@@ -330,7 +422,7 @@ async def complete_webauthn_auth_challenge(
 
 
 def _get_origin(
-    request: Request,
+        request: Request,
 ) -> str:
     origin_header = request.get_first_header(b"Origin")
     if origin_header:

@@ -453,7 +453,7 @@ async def create_webauthn_registration(
         scopes=DEFAULT_SCOPES,  # TODO
     )
 
-    signed_access_token, access_token = _create_access_token_from_refresh_token(
+    signed_access_token, access_token = create_access_token_from_refresh_token(
         config, account, refresh_token
     )
 
@@ -597,7 +597,7 @@ async def verify_webauthn_authentication_response(
         scopes=DEFAULT_SCOPES,  # TODO
         credential_id=refresh_token_id,
     )
-    signed_access_token, access_token = _create_access_token_from_refresh_token(
+    signed_access_token, access_token = create_access_token_from_refresh_token(
         config, account, refresh_token
     )
     exp_t = int((refresh_token.exp - now).total_seconds())
@@ -652,7 +652,7 @@ async def create_new_refresh_token(
     return signed, token
 
 
-def _create_access_token_from_refresh_token(
+def create_access_token_from_refresh_token(
     config: Config,
     account: AccountEntity,
     refresh_token: RefreshToken,

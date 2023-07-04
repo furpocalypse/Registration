@@ -37,7 +37,7 @@ NUM_RETRIES = len(RETRY_SECONDS)
 class HookEvent(str, Enum):
     """Hook event types."""
 
-    email_auth_code = "email_auth_code"
+    email_auth_code = "email.auth_code"
     """An email auth code is generated."""
 
     registration_created = "registration.created"
