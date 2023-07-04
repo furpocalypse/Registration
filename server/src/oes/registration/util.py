@@ -2,7 +2,7 @@
 import base64
 from collections.abc import Mapping, MutableMapping
 from datetime import datetime, timezone
-from typing import Optional, TypeVar
+from typing import Optional, TypeVar, Union
 
 from blacksheep.exceptions import NotFound
 
@@ -47,6 +47,15 @@ def merge_dict(a: MutableMapping, b: Mapping):
             a[k] = v
 
 
-def unpadded_urlsafe_b64decode(b: str) -> bytes:
+def unpadded_urlsafe_b64encode(b: Union[str, bytes]) -> str:
+    """URL-safe base64 encode that removes the padding."""
+    enc = base64.urlsafe_b64encode(b.encode() if isinstance(b, str) else b)
+    return enc.decode()
+
+
+def unpadded_urlsafe_b64decode(b: Union[str, bytes]) -> bytes:
     """URL-safe base64 decode that accepts missing padding."""
-    return base64.urlsafe_b64decode(b + "==")
+    if isinstance(b, bytes):
+        return base64.urlsafe_b64decode(b + b"==")
+    else:
+        return base64.urlsafe_b64decode(b + "==")

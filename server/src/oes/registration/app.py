@@ -12,7 +12,8 @@ from blacksheep.server.remotes.forwarding import XForwardedHeadersMiddleware
 from guardpost import Policy
 from guardpost.common import AuthenticatedRequirement
 from loguru import logger
-
+from oes.registration.auth.account_service import AccountService
+from oes.registration.auth.credential_service import CredentialService
 from oes.registration.auth.email_auth_service import EmailAuthService
 from oes.registration.auth.handlers import (
     TokenAuthHandler,
@@ -62,6 +63,8 @@ json.use(
 
 app.services.add_scoped(AuthService)
 app.services.add_scoped(EmailAuthService)
+app.services.add_scoped(AccountService)
+app.services.add_scoped(CredentialService)
 app.services.add_scoped(HookService)
 app.services.add_scoped(EventService)
 app.services.add_scoped(RegistrationService)
@@ -348,5 +351,6 @@ import oes.registration.views.auth  # noqa
 import oes.registration.views.cart  # noqa
 import oes.registration.views.checkout  # noqa
 import oes.registration.views.event  # noqa
+import oes.registration.views.oauth  # noqa
 import oes.registration.views.registration  # noqa
 import oes.registration.views.selfservice  # noqa
