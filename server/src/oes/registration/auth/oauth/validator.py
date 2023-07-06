@@ -79,7 +79,7 @@ class CustomValidator(RequestValidator):
         *args,
         **kwargs
     ) -> bool:
-        return all(s in Scope.__members__ for s in scopes)
+        return all(s in Scope.__members__.values() for s in scopes)
 
     def get_default_scopes(
         self, client_id: str, request: Request, *args, **kwargs

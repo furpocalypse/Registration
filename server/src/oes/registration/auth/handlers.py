@@ -1,6 +1,7 @@
 """Auth handlers."""
 from collections.abc import Callable
 from typing import Any, Optional
+from uuid import UUID
 
 from attrs import evolve
 from blacksheep import Request
@@ -11,7 +12,9 @@ from guardpost.asynchronous.authentication import AuthenticationHandler
 from guardpost.authorization import AuthorizationContext
 from guardpost.synchronous.authorization import Requirement
 from jwt import InvalidTokenError
-from oes.registration.auth.models import AccessToken, Scope, Scopes, User
+from oes.registration.auth.oauth.scope import Scope, Scopes
+from oes.registration.auth.oauth.token import AccessToken
+from oes.registration.auth.oauth.user import User
 from oes.registration.config import CommandLineConfig
 from oes.registration.models.config import Config
 
@@ -44,9 +47,17 @@ class TokenAuthHandler(AuthenticationHandler):
         if token:
             # If the testing no_auth setting is enabled, override scopes
             if self.cmd_config.insecure and self.cmd_config.no_auth:
-                token = evolve(token, scope=Scopes(frozenset(s for s in Scope)))
+                token = evolve(
+                    token, scope=Scopes(s for s in Scope.__members__.values())
+                )
 
-            user = User(token)
+            user = User(
+                {
+                    "id": UUID(token.sub) if token.sub else None,
+                    "email": token.email,
+                    "scope": token.scope,
+                }
+            )
             context.identity = user
             return user
         else:
@@ -67,7 +78,7 @@ class ScopeRequirement(Requirement):
             context.fail("Missing identity")
             return
 
-        if not isinstance(identity, User) or not identity.has_scope(self.scope):
+        if not isinstance(identity, User) or self.scope not in identity.scope:
             context.fail(f"Missing scope {self.scope}")
             # workaround: the authorization framework returns 401 instead of 403...
             raise Forbidden

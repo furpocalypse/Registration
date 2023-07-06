@@ -1,14 +1,9 @@
-export interface WebAuthChallenge {
+export interface WebAuthnChallenge {
   challenge: string
   options: Record<string, unknown>
 }
 
-export interface CreateWebAuthnRegistrationRequest {
-  challenge: string
-  result: string
-}
-
-export interface WebAuthnAuthenticationRequest {
+export interface WebAuthnChallengeResult {
   challenge: string
   result: string
 }

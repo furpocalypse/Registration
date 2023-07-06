@@ -7,9 +7,9 @@ from uuid import UUID
 import jwt
 from loguru import logger
 from oes.registration.auth.account_service import AccountService
-from oes.registration.auth.entities import AccountEntity, CredentialEntity
+from oes.registration.auth.entities import CredentialEntity
 from oes.registration.auth.models import CredentialType
-from oes.registration.auth.oauth.scope import DEFAULT_SCOPES, Scopes
+from oes.registration.auth.oauth.scope import Scopes
 from oes.registration.auth.oauth.token import (
     DEFAULT_REFRESH_TOKEN_LIFETIME,
     RefreshToken,
@@ -63,7 +63,11 @@ def create_new_refresh_token(
         account_id=user.id if user is not None else None,
         credential_id=credential_id,
         token_num=1,
-        scope=scope if scope is not None else DEFAULT_SCOPES,
+        scope=scope
+        if scope is not None
+        else user.scope
+        if user is not None
+        else Scopes(),
         email=user.email if user is not None else None,
         expiration_date=expiration_date
         if expiration_date is not None

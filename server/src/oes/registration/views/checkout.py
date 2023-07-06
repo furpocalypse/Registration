@@ -16,7 +16,7 @@ from blacksheep.server.openapi.common import ContentInfo, ResponseInfo
 from loguru import logger
 from oes.registration.app import app
 from oes.registration.auth.handlers import RequireCart
-from oes.registration.auth.models import User
+from oes.registration.auth.oauth.user import User
 from oes.registration.auth.service import AuthService
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper

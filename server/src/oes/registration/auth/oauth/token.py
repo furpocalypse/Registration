@@ -18,11 +18,14 @@ from typing_extensions import Self
 
 ALGORITHM = "HS256"
 
-DEFAULT_ACCESS_TOKEN_LIFETIME = timedelta(seconds=900)
+DEFAULT_ACCESS_TOKEN_LIFETIME = timedelta(minutes=15)
 """Default access token lifetime."""
 
 DEFAULT_REFRESH_TOKEN_LIFETIME = timedelta(days=90)
-"""Default access token lifetimes."""
+"""Default refresh token lifetime."""
+
+WEBAUTHN_REFRESH_TOKEN_LIFETIME = timedelta(hours=1)
+"""Default refresh token lifetime for WebAuthn."""
 
 converter = make_converter()
 """A converter for tokens."""
@@ -86,8 +89,11 @@ class AccessToken(TokenBase):
     def user(self) -> User:
         """The :class:`User` this token is for."""
         return User(
-            id=UUID(self.sub) if self.sub else None,
-            email=self.email,
+            {
+                "id": UUID(self.sub) if self.sub else None,
+                "email": self.email,
+                "scope": self.scope,
+            }
         )
 
     @classmethod
@@ -160,8 +166,11 @@ class RefreshToken(TokenBase):
     def user(self) -> User:
         """The :class:`User` this token is for."""
         return User(
-            id=UUID(self.sub) if self.sub else None,
-            email=self.email,
+            {
+                "id": UUID(self.sub) if self.sub else None,
+                "email": self.email,
+                "scope": self.scope,
+            }
         )
 
     @classmethod
@@ -227,7 +236,6 @@ class RefreshToken(TokenBase):
             scope: Optional reduced scope for the resulting token.
             expiration_date: A non-default expiration date.
         """
-
         return AccessToken.create(
             account_id=self.sub,
             scope=Scopes((self.scope & scope) if scope is not None else self.scope),
@@ -273,30 +281,37 @@ class TokenResponse:
             refresh_token.encode(key=key) if refresh_token is not None else None
         )
 
-        if expires_in is None:
-            iat = access_token.iat if access_token is not None else None
-            now = iat if iat is not None else get_now(seconds_only=True)
-
-            expires_in = (
-                int((access_token.exp - now).total_seconds())
-                if access_token is not None
-                else None
-            )
-
-        if isinstance(scope, str):
-            scope_str = scope
-        elif isinstance(scope, Scopes):
-            scope_str = str(scope)
-        else:
-            scope_str = None
-
         return cls(
             token_type="Bearer",
             access_token=enc_access_token,
             refresh_token=enc_refresh_token,
-            scope=scope_str,
-            expires_in=expires_in,
+            scope=_scope_to_str(scope),
+            expires_in=_compute_expires_in(expires_in, access_token),
         )
+
+
+def _compute_expires_in(
+    expires_in: Optional[int],
+    access_token: Optional[AccessToken],
+) -> Optional[int]:
+    if expires_in is not None:
+        return expires_in
+
+    if access_token is None:
+        return None
+    now = (
+        access_token.iat if access_token.iat is not None else get_now(seconds_only=True)
+    )
+    return int((access_token.exp - now).total_seconds())
+
+
+def _scope_to_str(scope: Union[str, Scopes, None]) -> Optional[str]:
+    if isinstance(scope, str):
+        return scope
+    elif isinstance(scope, Scopes):
+        return str(scope)
+    else:
+        return None
 
 
 # Structure/unstructure hooks

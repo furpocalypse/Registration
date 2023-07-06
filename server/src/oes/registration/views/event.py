@@ -5,7 +5,7 @@ from blacksheep import auth
 from blacksheep.exceptions import NotFound
 from oes.registration.app import app
 from oes.registration.auth.handlers import RequireEvent
-from oes.registration.auth.models import User
+from oes.registration.auth.oauth.user import User
 from oes.registration.docs import docs_helper
 from oes.registration.models.event import Event, EventConfig
 from oes.registration.util import check_not_found

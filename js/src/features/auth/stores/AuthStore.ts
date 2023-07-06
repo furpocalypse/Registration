@@ -1,409 +1,327 @@
+import { action, makeObservable, observable, runInAction } from "mobx"
+import * as oauth from "oauth4webapi"
+import * as yup from "yup"
+import { Wretch } from "wretch"
 import {
-  checkAuthStatus,
-  completeWebAuthnAuthentication,
-  createAccount,
-  createWebAuthnRegistration,
-  getWebAuthnAuthenticationChallenge,
-  getWebAuthnRegistrationChallenge,
-  refreshAccessToken,
-} from "#src/features/auth/api.js"
-import {
-  AuthStatusResponse,
-  AuthorizationData,
-} from "#src/features/auth/types/AuthData.js"
-import { AuthSettings } from "#src/features/auth/types/AuthSettings.js"
-import {
-  browserSupportsWebAuthn,
-  platformAuthenticatorIsAvailable,
-  startAuthentication,
-  startRegistration,
-} from "@simplewebauthn/browser"
-import { makeAutoObservable, runInAction, when } from "mobx"
-import {
-  ConfiguredMiddleware,
-  FetchLike,
-  Wretch,
-  WretchOptions,
-  WretchResponse,
-} from "wretch"
-
-const LOCAL_STORAGE_KEY = "oes-auth-data"
+  getAccessTokenMiddleware,
+  getRetryMiddleware,
+} from "#src/features/auth/authMiddleware.js"
 
 /**
- * Store that holds authorization state.
+ * The client ID of the main JS app.
  */
-export class AuthStore {
-  private _authorizationData: AuthorizationData | null = null
-  private tokenReturnedUnauthorized = false
-  private refreshPromise: Promise<AuthorizationData | null> | null = null
-  private webAuthnCredentialId: string | null = null
-  private _authWretch: Wretch
-  private _setupComplete = false
+const JS_CLIENT_ID = "oes"
 
-  constructor(public wretch: Wretch, public authOrigin: string) {
-    this._authWretch = wretch.middlewares([this.getAuthMiddleware()])
-    makeAutoObservable(this)
+/**
+ * The redirect URI.
+ */
+const REDIRECT_URI = "/auth/redirect"
 
-    window.addEventListener("storage", (event) => {
-      if (event.key == LOCAL_STORAGE_KEY && event.newValue) {
-        const data = JSON.parse(event.newValue)
-        if (data.authorizationData && data.authorizationData.accessToken) {
-          // load new auth data if another window sets it
-          runInAction(() => {
-            this._authorizationData = AuthorizationData.createFromJSON(
-              data.authorizationData
-            )
-            this.tokenReturnedUnauthorized = false
-          })
-        }
-      }
-    })
+/**
+ * The local storage key for the auth data.
+ */
+const LOCAL_STORAGE_KEY = "oes-auth-data-v1"
+
+const authInfoSchema = yup.object({
+  tokenType: yup.string().defined(),
+  accessToken: yup.string().defined(),
+  refreshToken: yup.string().nullable(),
+  expiresAt: yup.number().nullable(),
+  scope: yup.string().nullable(),
+})
+
+/**
+ * Store auth information.
+ */
+export class AuthInfo {
+  constructor(
+    private _tokenType: string,
+    private _accessToken: string,
+    private _refreshToken: string | null = null,
+    private _expiresAt: number | null = null,
+    private _scope: string | null = null
+  ) {}
+
+  /**
+   * The access token.
+   */
+  get accessToken(): string {
+    return this._accessToken
   }
 
   /**
-   * Save the current settings to local storage.
+   * The refresh token.
    */
-  save() {
-    AuthStore.save({
-      authorizationData: this._authorizationData ?? undefined,
-      webAuthnCredentialId: this.webAuthnCredentialId ?? undefined,
-    })
+  get refreshToken(): string | null {
+    return this._refreshToken
   }
 
   /**
-   * Save {@link AuthSettings} to local storage.
+   * The access token expiration date.
    */
-  static save(settings: AuthSettings) {
-    const asStr = JSON.stringify(settings)
-    window.localStorage.setItem(LOCAL_STORAGE_KEY, asStr)
-  }
-
-  /**
-   * Load {@link AuthSettings} from local storage.
-   */
-  static load(): AuthSettings {
-    try {
-      const dataStr = window.localStorage.getItem(LOCAL_STORAGE_KEY)
-      if (!dataStr) {
-        return {}
-      }
-
-      const obj = JSON.parse(dataStr)
-      const authData = AuthorizationData.createFromJSON(obj.authorizationData)
-      return {
-        authorizationData: authData ?? undefined,
-        webAuthnCredentialId: obj.webAuthnCredentialId ?? undefined,
-      }
-    } catch (_) {
-      return {}
+  get expiresAt(): Date | null {
+    if (this._expiresAt != null) {
+      return new Date(this._expiresAt * 1000)
+    } else {
+      return null
     }
   }
 
-  get setupComplete(): boolean {
-    return this._setupComplete
-  }
-
-  get authorizationData(): AuthorizationData | null {
-    return this._authorizationData
+  /**
+   * The scope.
+   */
+  get scope(): string | null {
+    return this._scope
   }
 
   /**
-   * Check whether the current {@link AuthorizationData} is valid.
-   * @param now - The current time.
+   * Create a {@link AuthInfo} from a token endpoint response.
    */
-  checkValid(now?: Date): boolean {
-    return (
-      this._authorizationData != null &&
-      !this.tokenReturnedUnauthorized &&
-      this._authorizationData.checkValid(now)
+  static createFromResponse(response: oauth.TokenEndpointResponse): AuthInfo {
+    let expiresAt = null
+    if (response.expires_in != null) {
+      const now = Math.floor(new Date().getTime() / 1000)
+      expiresAt = now + response.expires_in
+    }
+
+    return new AuthInfo(
+      response.token_type,
+      response.access_token,
+      response.refresh_token ?? null,
+      expiresAt,
+      response.scope ?? null
     )
   }
 
   /**
-   * Whether a refresh token is present.
+   * Parse a {@link AuthInfo} from an object.
+   *
+   * @returns A {@link AuthInfo} object, or null if it could not be parsed.
    */
-  get canRefresh(): boolean {
-    return !!this._authorizationData?.refreshToken
+  static createFromObject(obj: object): AuthInfo | null {
+    try {
+      const parsed = authInfoSchema.validateSync(obj)
+      return new AuthInfo(
+        parsed.tokenType,
+        parsed.accessToken,
+        parsed.refreshToken ?? null,
+        parsed.expiresAt ?? null,
+        parsed.scope ?? null
+      )
+    } catch (_) {
+      return null
+    }
   }
 
   /**
-   * A {@link Wretch} instance with authorization info included.
+   * Return whether the access token is expired.
+   */
+  getIsExpired(): boolean {
+    const now = Math.floor(new Date().getTime() / 1000)
+    return this._expiresAt != undefined && now >= this._expiresAt
+  }
+
+  toJSON() {
+    return {
+      tokenType: this._tokenType,
+      accessToken: this._accessToken,
+      refreshToken: this._refreshToken,
+      expiresAt: this._expiresAt,
+      scope: this._scope,
+    }
+  }
+}
+
+export class AuthStore {
+  private _authWretch: Wretch
+
+  private client: oauth.Client
+  private authServer: oauth.AuthorizationServer
+
+  private authInfo: AuthInfo | null = null
+  private _loaded = false
+  private _invalid = false
+
+  /**
+   * A {@link Wretch} instance with authorization features added.
    */
   get authWretch(): Wretch {
     return this._authWretch
   }
 
   /**
-   * Check the current auth status.
+   * Whether the auth status has been loaded.
    */
-  async getCurrentAuthStatus(): Promise<AuthStatusResponse | null> {
-    if (!this._authorizationData) {
-      return null
-    }
-    const token = this._authorizationData.accessToken
-    const res = await checkAuthStatus(this.wretch, token)
-    runInAction(() => {
-      if (!res && token == this._authorizationData?.accessToken) {
-        this.tokenReturnedUnauthorized = true
-      }
-    })
-    return res
+  get loaded(): boolean {
+    return this._loaded
   }
 
   /**
-   * Attempt to refresh the access token.
-   *
-   * Sets or clears the loaded {@link AuthorizationData} and updates local storage.
-   *
-   * @returns The new {@link AuthorizationData} or `null` if it fails.
+   * The current access token.
    */
-  async refresh(): Promise<AuthorizationData | null> {
-    const refreshToken = this._authorizationData?.refreshToken as string
-    const result = await refreshAccessToken(this.wretch, refreshToken)
-    if (!result) {
-      runInAction(() => {
-        this._authorizationData = null
-      })
-      this.save()
-      return null
+  get accessToken(): string | null {
+    return this.authInfo?.accessToken ?? null
+  }
+
+  constructor(serverBaseURL: URL, public wretch: Wretch) {
+    this._authWretch = wretch.middlewares([
+      getRetryMiddleware(this),
+      getAccessTokenMiddleware(serverBaseURL, this),
+    ])
+
+    this.client = {
+      client_id: JS_CLIENT_ID,
+      token_endpoint_auth_method: "none",
     }
 
-    return runInAction(() => {
-      const authData = AuthorizationData.createFromTokenResponse(result)
-      this._authorizationData = authData
-      this.tokenReturnedUnauthorized = false
-      this.save()
-      return authData
+    let baseURLStr = serverBaseURL.toString()
+    if (baseURLStr.endsWith("/")) {
+      baseURLStr = baseURLStr.substring(0, baseURLStr.length - 1)
+    }
+
+    this.authServer = {
+      issuer: JS_CLIENT_ID, // TODO
+      token_endpoint: `${baseURLStr}/auth/token`,
+    }
+
+    makeObservable<this, "authInfo" | "_loaded" | "_invalid">(this, {
+      authInfo: observable.ref,
+      _loaded: observable,
+      _invalid: observable,
+      setup: action,
+      setAuthInfo: action,
+      markInvalid: action,
+      refresh: action,
     })
-  }
 
-  private async waitForValidToken(): Promise<string> {
-    for (;;) {
-      await when(() => this.checkValid())
-      const token = this._authorizationData?.accessToken
-      if (token) {
-        return token
-      }
-    }
-  }
-
-  private getAuthMiddleware(): ConfiguredMiddleware {
-    return (next) => async (url, opts) => {
-      // continue as normal if the origin is unrelated
-      const urlObj = new URL(url)
-      if (urlObj.origin != this.authOrigin) {
-        return await next(url, opts)
-      }
-
-      // retry on auth errors
-      for (;;) {
-        const accessToken = await this.waitForValidToken()
-        const response = await fetchWithAuth(accessToken, next, url, opts)
-        if (response.status != 401) {
-          return response
-        } else {
-          // handle unauthorized
-
-          // mark that the token returned unauthorized, unless something else changed it
-          // in the meantime
-          const currentToken = this._authorizationData?.accessToken
-          runInAction(() => {
-            if (currentToken == accessToken) {
-              this.tokenReturnedUnauthorized = true
-            }
-          })
-
-          // start a refresh attempt if it is possible and it has not already been
-          // started
-          if (
-            currentToken == accessToken &&
-            !this.refreshPromise &&
-            this.canRefresh
-          ) {
-            // start the refresh process
-            const refreshPromise = this.refresh()
-              .catch(() => null)
-              .then((res) => {
-                runInAction(() => {
-                  this.refreshPromise = null
-                })
-                return res
-              })
-
+    // update the auth info if another window updates it in storage
+    window.addEventListener("storage", (e) => {
+      if (e.key == LOCAL_STORAGE_KEY && e.newValue) {
+        try {
+          const obj = JSON.parse(e.newValue)
+          const loaded = AuthInfo.createFromObject(obj)
+          if (loaded) {
             runInAction(() => {
-              this.refreshPromise = refreshPromise
+              this.authInfo = loaded
+              this._invalid = false
             })
           }
-
-          // continue
+        } catch (_) {
+          // ignore
         }
       }
-    }
+    })
   }
 
   /**
-   * Run initial setup.
+   * Get whether the client is authorized/has a valid access token.
+   */
+  getIsAuthorized(): boolean {
+    return (
+      this._loaded &&
+      !!this.authInfo?.accessToken &&
+      !this.authInfo.getIsExpired() &&
+      !this._invalid
+    )
+  }
+
+  /**
+   * Set up the auth store.
    */
   async setup() {
-    const curAuthSettings = AuthStore.load()
-    if (curAuthSettings) {
-      this._authorizationData = curAuthSettings.authorizationData ?? null
-      this.webAuthnCredentialId = curAuthSettings.webAuthnCredentialId ?? null
-    }
-
-    if (!this.checkValid() && this.canRefresh) {
-      await this.refresh()
-    }
-
-    if (!this.checkValid()) {
-      // refresh didn't work, try webauthn signin
-      if (this.webAuthnCredentialId) {
-        try {
-          const res = await this.performWebAuthnAuthorization(
-            this.webAuthnCredentialId
-          )
-          runInAction(() => {
-            this._authorizationData = res
-            this.tokenReturnedUnauthorized = false
-          })
-          this.save()
-        } catch (err) {
-          console.error("WebAuthn authentication failed", err)
-        }
+    const loaded = loadAuthInfo()
+    if (loaded) {
+      if (!loaded.getIsExpired()) {
+        this.authInfo = loaded
+      } else if (loaded.refreshToken) {
+        await this.refresh()
       }
     }
 
     runInAction(() => {
-      this._setupComplete = true
+      this._loaded = true
     })
   }
 
   /**
-   * Create a new account.
+   * Set the {@link AuthInfo}.
    */
-  async createAccount() {
-    const newAccount = await createAccount(this.wretch)
-    runInAction(() => {
-      this._authorizationData =
-        AuthorizationData.createFromTokenResponse(newAccount)
-      this.tokenReturnedUnauthorized = false
-      this.webAuthnCredentialId = null
-    })
-    this.save()
+  setAuthInfo(authInfo: AuthInfo | null) {
+    this._invalid = false
+    this.authInfo = authInfo
+    saveAuthInfo(authInfo)
   }
 
   /**
-   * Check if WebAuthn appears to be available.
-   * @returns
+   * Mark the given access token as being invalid.
+   * @returns true if the state was updated, false if it was already marked invalid.
    */
-  checkWebAuthnAvailable(): boolean {
-    return browserSupportsWebAuthn()
+  markInvalid(accessToken: string): boolean {
+    if (this.authInfo?.accessToken == accessToken && !this._invalid) {
+      this._invalid = true
+      return true
+    } else {
+      return false
+    }
   }
 
   /**
-   * Check if a user-verifying platform authenticator is available.
+   * Attempt to use a refresh token.
+   * @returns A new {@link AuthInfo} or null if unsuccessful.
    */
-  async checkPlatformAuthAvailable(): Promise<boolean> {
-    return await platformAuthenticatorIsAvailable()
-  }
-
-  /**
-   * Create a WebAuthn registration.
-   */
-  private async createWebAuthnRegistration(
-    currentAccessToken: string
-  ): Promise<[string, AuthorizationData] | null> {
-    const wretch = this.wretch.headers({
-      Authorization: `Bearer ${currentAccessToken}`,
-    })
-
-    const challenge = await getWebAuthnRegistrationChallenge(wretch)
-
-    let attestationResponse
-    try {
-      attestationResponse = await startRegistration(challenge.options)
-    } catch (err) {
-      // ignore
-      console.error("WebAuthn registration failed", err)
+  async refresh(): Promise<AuthInfo | null> {
+    if (!this.authInfo?.refreshToken) {
+      this.setAuthInfo(null)
       return null
     }
 
-    const credentialId = attestationResponse.id
+    const resp = await oauth.refreshTokenGrantRequest(
+      this.authServer,
+      this.client,
+      this.authInfo.refreshToken
+    )
 
-    const tokenResponse = await createWebAuthnRegistration(wretch, {
-      challenge: challenge.challenge,
-      result: JSON.stringify(attestationResponse),
-    })
-
-    return [
-      credentialId,
-      AuthorizationData.createFromTokenResponse(tokenResponse),
-    ]
-  }
-
-  /**
-   * Create a new account via WebAuthn.
-   * @returns
-   */
-  async createWebAuthnAccount() {
-    const newAccount = await createAccount(this.wretch)
-    try {
-      const authResult = await this.createWebAuthnRegistration(
-        newAccount.access_token
-      )
-
-      if (authResult) {
-        const [credentialId, authData] = authResult
-
-        runInAction(() => {
-          this._authorizationData = authData
-          this.tokenReturnedUnauthorized = false
-          this.webAuthnCredentialId = credentialId
-        })
-
-        this.save()
-        return
-      }
-    } catch (_) {
-      // ignore
+    const parsed = await oauth.processRefreshTokenResponse(
+      this.authServer,
+      this.client,
+      resp
+    )
+    if (oauth.isOAuth2Error(parsed)) {
+      this.setAuthInfo(null)
+      return null
     }
 
-    // set the original token
-    runInAction(() => {
-      this._authorizationData =
-        AuthorizationData.createFromTokenResponse(newAccount)
-      this.tokenReturnedUnauthorized = false
-    })
-    this.save()
-  }
-
-  private async performWebAuthnAuthorization(accountId: string) {
-    const challenge = await getWebAuthnAuthenticationChallenge(
-      this.wretch,
-      accountId
-    )
-    const authResult = await startAuthentication(challenge.options)
-    const tokenResponse = await completeWebAuthnAuthentication(this.wretch, {
-      challenge: challenge.challenge,
-      result: JSON.stringify(authResult),
-    })
-
-    return AuthorizationData.createFromTokenResponse(tokenResponse)
+    const newAuthInfo = AuthInfo.createFromResponse(parsed)
+    this.setAuthInfo(newAuthInfo)
+    return newAuthInfo
   }
 }
 
 /**
- * Call the fetch function with a given access token.
- * @param accessToken - The access token.
+ * Save the {@link AuthInfo} to local storage.
  */
-const fetchWithAuth = async (
-  accessToken: string,
-  fetchLike: FetchLike,
-  url: string,
-  opts: WretchOptions
-): Promise<WretchResponse> => {
-  const newHeaders = new Headers(opts.headers)
-  newHeaders.set("Authorization", `Bearer ${accessToken}`)
+const saveAuthInfo = (info: AuthInfo | null) => {
+  if (info) {
+    const stringified = JSON.stringify(info)
+    window.localStorage.setItem(LOCAL_STORAGE_KEY, stringified)
+  } else {
+    window.localStorage.removeItem(LOCAL_STORAGE_KEY)
+  }
+}
 
-  return await fetchLike(url, { ...opts, headers: newHeaders })
+/**
+ * Load the {@link AuthInfo} from local storage.
+ */
+const loadAuthInfo = (): AuthInfo | null => {
+  const stringified = window.localStorage.getItem(LOCAL_STORAGE_KEY)
+  if (stringified) {
+    try {
+      const obj = JSON.parse(stringified)
+      return AuthInfo.createFromObject(obj)
+    } catch (_) {
+      return null
+    }
+  } else {
+    return null
+  }
 }

@@ -347,7 +347,6 @@ def parse_args() -> CommandLineConfig:
 # Import views
 
 import oes.registration.views.access_code  # noqa
-import oes.registration.views.auth  # noqa
 import oes.registration.views.cart  # noqa
 import oes.registration.views.checkout  # noqa
 import oes.registration.views.event  # noqa

@@ -1,4 +1,5 @@
 """Account service module."""
+import uuid
 from typing import Optional
 from uuid import UUID
 
@@ -8,6 +9,8 @@ from sqlalchemy.orm import selectinload
 
 
 class AccountService:
+    """Account service."""
+
     db: AsyncSession
 
     def __init__(self, db: AsyncSession):
@@ -17,7 +20,6 @@ class AccountService:
         self, id: UUID, *, lock: bool = False, with_credentials: bool = False
     ) -> Optional[AccountEntity]:
         """Get an account by ID."""
-
         options = []
 
         if with_credentials:
@@ -30,9 +32,14 @@ class AccountService:
             with_for_update=lock,
         )
 
-    async def create_account(self, email: Optional[str]) -> AccountEntity:
+    async def create_account(
+        self,
+        email: Optional[str],
+        id: Optional[UUID] = None,
+    ) -> AccountEntity:
         """Create a new account."""
         entity = AccountEntity(
+            id=id if id is not None else uuid.uuid4(),
             email=email,
             credentials=[],
             registrations=[],

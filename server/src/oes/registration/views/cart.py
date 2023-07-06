@@ -22,7 +22,7 @@ from oes.interview.response import IncompleteInterviewStateResponse
 from oes.interview.state import InvalidStateError
 from oes.registration.app import app
 from oes.registration.auth.handlers import RequireAdmin, RequireCart, RequireSelfService
-from oes.registration.auth.models import User
+from oes.registration.auth.oauth.user import User
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper, serialize
 from oes.registration.entities.cart import CartEntity
