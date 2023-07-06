@@ -405,7 +405,7 @@ async def _get_registration_for_change(
 
     # Check that the user account is assocated with this registration
     # TODO: check emails also
-    if user.id not in [a.id for a in reg.accounts]:
+    if not user.id or user.id not in [a.id for a in reg.accounts]:
         raise NotFound
 
     return reg
@@ -441,7 +441,7 @@ def _get_interview_initial_data(
             {
                 "account_id": str(user.id),
             }
-            if user
+            if user and user.id
             else {}
         )
 

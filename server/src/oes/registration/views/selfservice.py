@@ -41,9 +41,15 @@ async def list_self_service_registration(
     else:
         add_options = []
 
-    registrations = await service.list_self_service_registrations(
-        user.id,
-        event_id=event_id.value,
+    registrations = (
+        (
+            await service.list_self_service_registrations(
+                user.id,
+                event_id=event_id.value,
+            )
+        )
+        if user.id
+        else []
     )
 
     results = []
