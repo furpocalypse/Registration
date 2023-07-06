@@ -22,7 +22,6 @@ from oes.registration.auth.handlers import (
     require_event,
     require_self_service,
 )
-from oes.registration.auth.service import AuthService
 from oes.registration.config import CommandLineConfig, load_config, load_event_config
 from oes.registration.database import (
     DBConfig,
@@ -61,7 +60,6 @@ json.use(
     dumps=lambda o: json_dumps(o).decode(),  # :(
 )
 
-app.services.add_scoped(AuthService)
 app.services.add_scoped(EmailAuthService)
 app.services.add_scoped(AccountService)
 app.services.add_scoped(CredentialService)

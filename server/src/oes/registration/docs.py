@@ -7,7 +7,7 @@ from typing import Any, Optional, Type, TypeVar, Union, cast, get_args, get_orig
 from attrs import Attribute, fields
 from blacksheep.server.openapi.common import ContentInfo, ResponseInfo
 from blacksheep.server.openapi.v3 import FieldInfo, ObjectTypeHandler, OpenAPIHandler
-from oes.registration.auth.models import Scope
+from oes.registration.auth.oauth.scope import Scope
 from oes.registration.serialization import get_converter
 from openapidocs.v3 import (
     HTTPSecurity,

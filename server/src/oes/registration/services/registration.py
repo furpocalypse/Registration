@@ -3,8 +3,8 @@ from collections.abc import Iterable, Sequence
 from typing import Optional
 from uuid import UUID
 
+from oes.registration.auth.account_service import AccountService
 from oes.registration.auth.entities import AccountEntity
-from oes.registration.auth.service import AuthService
 from oes.registration.entities.event_stats import EventStatsEntity
 from oes.registration.entities.registration import RegistrationEntity
 from oes.registration.hook.models import HookEvent
@@ -212,9 +212,9 @@ def assign_registration_numbers(
 async def add_account_to_registration(
     account_id: UUID,
     registration: RegistrationEntity,
-    auth_service: AuthService,
+    account_service: AccountService,
 ):
     """Associate an account with a registration."""
-    account = await auth_service.get_account(account_id)
+    account = await account_service.get_account(account_id)
     if account:
         registration.accounts.append(account)
