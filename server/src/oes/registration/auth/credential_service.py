@@ -9,18 +9,20 @@ from loguru import logger
 from oes.registration.auth.account_service import AccountService
 from oes.registration.auth.entities import CredentialEntity
 from oes.registration.auth.models import CredentialType
-from oes.registration.auth.oauth.scope import Scopes
-from oes.registration.auth.oauth.token import (
+from oes.registration.auth.scope import Scopes
+from oes.registration.auth.token import (
     DEFAULT_REFRESH_TOKEN_LIFETIME,
     RefreshToken,
     converter,
 )
-from oes.registration.auth.oauth.user import User
+from oes.registration.auth.user import User
 from oes.registration.util import get_now
 from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class CredentialService:
+    """Credential service."""
+
     def __init__(self, db: AsyncSession):
         self.db = db
 
@@ -71,7 +73,7 @@ def create_new_refresh_token(
         email=user.email if user is not None else None,
         expiration_date=expiration_date
         if expiration_date is not None
-        else (get_now() + DEFAULT_REFRESH_TOKEN_LIFETIME),
+        else (get_now(seconds_only=True) + DEFAULT_REFRESH_TOKEN_LIFETIME),
     )
 
 

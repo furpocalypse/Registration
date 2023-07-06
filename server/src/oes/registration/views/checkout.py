@@ -17,7 +17,7 @@ from loguru import logger
 from oes.registration.app import app
 from oes.registration.auth.account_service import AccountService
 from oes.registration.auth.handlers import RequireCart
-from oes.registration.auth.oauth.user import User
+from oes.registration.auth.user import User
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState

@@ -1,7 +1,8 @@
 """oauthlib request validator module."""
 import asyncio
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
+from uuid import UUID
 
 import jwt
 from oauthlib.common import Request
@@ -14,9 +15,9 @@ from oes.registration.auth.credential_service import (
     validate_refresh_token,
 )
 from oes.registration.auth.oauth.client import Client, get_js_client
-from oes.registration.auth.oauth.scope import DEFAULT_SCOPES, Scope, Scopes
-from oes.registration.auth.oauth.token import AccessToken, RefreshToken
-from oes.registration.auth.oauth.user import User
+from oes.registration.auth.scope import DEFAULT_SCOPES, Scope, Scopes
+from oes.registration.auth.token import AccessToken, RefreshToken
+from oes.registration.auth.user import UserIdentity
 from oes.registration.models.config import AuthConfig
 
 
@@ -27,6 +28,8 @@ class GrantType(str, Enum):
 
 
 class CustomValidator(RequestValidator):
+    """Custom OAuth validator."""
+
     _auth_config: AuthConfig
     _account_service: AccountService
     _credential_service: CredentialService
@@ -135,23 +138,27 @@ class CustomValidator(RequestValidator):
     def validate_bearer_token(
         self, token: str, scopes: list[str], request: Request
     ) -> bool:
-        try:
-            access_token = AccessToken.decode(token, key=self._auth_config.signing_key)
-        except jwt.InvalidTokenError:
+        access_token = self._validate_token(token)
+        if access_token is None:
             return False
 
-        res = any(t in scopes for t in access_token.scope)
+        # All the resource's required scopes must be present in the token's scopes
+        if not all(s in access_token.scope for s in scopes):
+            return False
 
-        if res:
-            client = self._clients.get(access_token.azp) if access_token.azp else None
-            if client is not None:
-                request.client = client
+        client = self._clients.get(access_token.azp) if access_token.azp else None
+        if client is not None:
+            request.client = client
 
-            request.scopes = list(access_token.scope)
-            request.access_token = access_token
-            request.user = access_token.user
+        request.scopes = list(access_token.scope)
+        request.access_token = access_token
+        request.user = UserIdentity(
+            id=UUID(access_token.sub) if access_token.sub else None,
+            email=access_token.email,
+            scope=access_token.scope,
+        )
 
-        return res
+        return True
 
     def validate_refresh_token(
         self, refresh_token: str, client: Client, request: Request, *args, **kwargs
@@ -172,7 +179,11 @@ class CustomValidator(RequestValidator):
         if refresh_token_obj.azp is not None and refresh_token_obj.azp != client.id:
             return False
 
-        request.user = refresh_token_obj.user
+        request.user = UserIdentity(
+            id=UUID(refresh_token_obj.sub) if refresh_token_obj.sub else None,
+            email=refresh_token_obj.email,
+            scope=refresh_token_obj.scope,
+        )
         request.refresh_token = refresh_token_obj
         return True
 
@@ -184,8 +195,23 @@ class CustomValidator(RequestValidator):
         else:
             return []
 
+    def _validate_token(self, token: str) -> Optional[AccessToken]:
+        try:
+            return AccessToken.decode(token, key=self._auth_config.signing_key)
+        except jwt.InvalidTokenError:
+            return None
+
+    def _get_user(self, token: Union[AccessToken, RefreshToken]) -> UserIdentity:
+        return UserIdentity(
+            id=UUID(token.sub) if token.sub else None,
+            email=token.email,
+            scope=token.scope,
+        )
+
 
 class CustomServer(Server):
+    """OAuth custom server."""
+
     _auth_config: AuthConfig
     _account_service: AccountService
     _credential_service: CredentialService
@@ -224,10 +250,12 @@ class CustomServer(Server):
             # Update the token
             refresh_token = cur_token.reissue_refresh_token()
         else:
-            assert request.user is None or isinstance(request.user, User)
+            assert request.user is None or isinstance(request.user, UserIdentity)
             refresh_token = create_new_refresh_token(
                 request.user,
-                # TODO: check allowed scopes
+                request.user.scope
+                if request.user
+                else None,  # TODO: check allowed scopes
             )
 
         request.refresh_token = refresh_token

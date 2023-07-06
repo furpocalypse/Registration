@@ -1,4 +1,4 @@
-from oes.registration.auth.oauth.scope import Scope, Scopes
+from oes.registration.auth.scope import Scope, Scopes
 
 
 def test_scope_set_operations():

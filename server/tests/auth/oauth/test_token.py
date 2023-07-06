@@ -3,8 +3,8 @@ from uuid import UUID
 
 import jwt
 import pytest
-from oes.registration.auth.oauth.scope import Scopes
-from oes.registration.auth.oauth.token import (
+from oes.registration.auth.scope import Scopes
+from oes.registration.auth.token import (
     DEFAULT_REFRESH_TOKEN_LIFETIME,
     AccessToken,
     RefreshToken,

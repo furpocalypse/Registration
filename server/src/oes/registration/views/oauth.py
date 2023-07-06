@@ -14,14 +14,11 @@ from oes.registration.auth.credential_service import (
     create_refresh_token_entity,
 )
 from oes.registration.auth.models import CredentialType
-from oes.registration.auth.oauth.scope import DEFAULT_SCOPES
-from oes.registration.auth.oauth.token import (
-    WEBAUTHN_REFRESH_TOKEN_LIFETIME,
-    TokenResponse,
-)
-from oes.registration.auth.oauth.user import User
 from oes.registration.auth.oauth.validator import CustomServer
-from oes.registration.auth.oauth.webauthn import (
+from oes.registration.auth.scope import DEFAULT_SCOPES
+from oes.registration.auth.token import WEBAUTHN_REFRESH_TOKEN_LIFETIME, TokenResponse
+from oes.registration.auth.user import User
+from oes.registration.auth.webauthn import (
     WebAuthnAuthenticationChallenge,
     WebAuthnError,
     WebAuthnRegistrationChallenge,

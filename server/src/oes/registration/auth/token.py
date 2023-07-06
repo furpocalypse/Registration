@@ -11,8 +11,7 @@ from cattrs import BaseValidationError, override
 from cattrs.gen import make_dict_unstructure_fn
 from cattrs.preconf.orjson import make_converter
 from jwt import InvalidTokenError
-from oes.registration.auth.oauth.scope import Scope, Scopes
-from oes.registration.auth.oauth.user import User
+from oes.registration.auth.scope import Scopes
 from oes.registration.util import get_now
 from typing_extensions import Self
 
@@ -85,17 +84,6 @@ class AccessToken(TokenBase):
     email: Optional[str] = None
     scope: Scopes = Scopes()
 
-    @property
-    def user(self) -> User:
-        """The :class:`User` this token is for."""
-        return User(
-            {
-                "id": UUID(self.sub) if self.sub else None,
-                "email": self.email,
-                "scope": self.scope,
-            }
-        )
-
     @classmethod
     def create(
         cls,
@@ -117,7 +105,7 @@ class AccessToken(TokenBase):
         exp = (
             expiration_date
             if expiration_date is not None
-            else (get_now() + DEFAULT_ACCESS_TOKEN_LIFETIME)
+            else (get_now(seconds_only=True) + DEFAULT_ACCESS_TOKEN_LIFETIME)
         )
 
         return cls(
@@ -128,15 +116,6 @@ class AccessToken(TokenBase):
             azp=client_id,
             scope=scope if scope is not None else Scopes(),
         )
-
-    def has_scope(self, *scopes: str) -> bool:
-        """Return whether the token has all the given scopes."""
-        return all(s in self.scope for s in scopes)
-
-    @property
-    def is_admin(self) -> bool:
-        """Whether the token has the "admin" scope."""
-        return self.has_scope(Scope.admin)
 
 
 @frozen(kw_only=True)
@@ -162,17 +141,6 @@ class RefreshToken(TokenBase):
         _, _, num_str = self.jti.rpartition(":")
         return int(num_str)
 
-    @property
-    def user(self) -> User:
-        """The :class:`User` this token is for."""
-        return User(
-            {
-                "id": UUID(self.sub) if self.sub else None,
-                "email": self.email,
-                "scope": self.scope,
-            }
-        )
-
     @classmethod
     def create(
         cls,
@@ -182,6 +150,7 @@ class RefreshToken(TokenBase):
         scope: Optional[Scopes] = None,
         email: Optional[str] = None,
         client_id: Optional[str] = None,
+        issue_date: Optional[datetime] = None,
         expiration_date: Optional[datetime] = None,
     ) -> RefreshToken:
         """Create a :class:`RefreshToken`.
@@ -193,12 +162,14 @@ class RefreshToken(TokenBase):
             scope: The scope of the token.
             email: The email.
             client_id: The client ID.
+            issue_date: The issue date of this token.
             expiration_date: A non-default expiration date.
         """
+        iat = issue_date if issue_date is not None else get_now(seconds_only=True)
         exp = (
             expiration_date
             if expiration_date is not None
-            else (get_now() + DEFAULT_REFRESH_TOKEN_LIFETIME)
+            else (iat + DEFAULT_REFRESH_TOKEN_LIFETIME)
         )
 
         token_id = f"{credential_id}:{token_num}"
@@ -215,6 +186,14 @@ class RefreshToken(TokenBase):
 
     def reissue_refresh_token(self) -> RefreshToken:
         """Create a :class:`RefreshToken` with an incremented ``token_num``."""
+        diff = (
+            (self.exp - self.iat)
+            if self.iat is not None
+            else DEFAULT_REFRESH_TOKEN_LIFETIME
+        )
+        now = get_now(seconds_only=True)
+        exp = now + diff
+
         return self.create(
             account_id=self.sub,
             credential_id=self.credential_id,
@@ -222,6 +201,8 @@ class RefreshToken(TokenBase):
             scope=self.scope,
             email=self.email,
             client_id=self.azp,
+            issue_date=now,
+            expiration_date=exp,
         )
 
     def create_access_token(

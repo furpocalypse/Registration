@@ -1,3 +1,4 @@
+"""Scope module."""
 from collections.abc import Set
 from enum import Enum
 from typing import Iterable, Iterator
@@ -21,7 +22,7 @@ class Scope(str, Enum):
     """May use self-service endpoints and manage one's own registrations."""
 
 
-@frozen(init=False, repr=False)
+@frozen(init=False, repr=False, order=False)
 class Scopes(Set[str]):
     """A set of scopes."""
 

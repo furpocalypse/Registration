@@ -13,7 +13,7 @@ from oes.registration.auth.account_service import AccountService
 from oes.registration.auth.credential_service import CredentialService
 from oes.registration.auth.entities import AccountEntity, CredentialEntity
 from oes.registration.auth.models import CredentialType
-from oes.registration.auth.oauth.token import TokenBase
+from oes.registration.auth.token import TokenBase
 from oes.registration.models.config import AuthConfig
 from oes.registration.util import (
     get_now,

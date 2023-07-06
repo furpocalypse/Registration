@@ -12,7 +12,7 @@ from oes.template import Condition, Template, evaluate
 from typing_extensions import Self
 
 if TYPE_CHECKING:
-    from oes.registration.auth.oauth.user import User
+    from oes.registration.auth.user import User
 
 
 class Whenable(ABC):
