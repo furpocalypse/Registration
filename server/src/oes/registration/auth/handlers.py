@@ -67,7 +67,7 @@ def _get_token(request: Request) -> Optional[str]:
     if typ.lower() != b"bearer":
         return None
 
-    return header.decode()
+    return value.decode()
 
 
 def _decode_token(value: str, *, key: str) -> Optional[AccessToken]:

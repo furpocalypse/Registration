@@ -17,7 +17,7 @@ from oes.registration.auth.models import CredentialType
 from oes.registration.auth.oauth.validator import CustomServer
 from oes.registration.auth.scope import DEFAULT_SCOPES
 from oes.registration.auth.token import WEBAUTHN_REFRESH_TOKEN_LIFETIME, TokenResponse
-from oes.registration.auth.user import User
+from oes.registration.auth.user import UserIdentity
 from oes.registration.auth.webauthn import (
     WebAuthnAuthenticationChallenge,
     WebAuthnError,
@@ -63,13 +63,10 @@ async def new_account_endpoint(
 ) -> TokenResponse:
     """Create a new account, without credentials."""
     new_account = await account_service.create_account(None)
-    user = User(
-        {
-            "id": new_account.id,
-            "email": new_account.email,
-            # TODO: when to get default scopes?
-            "scope": DEFAULT_SCOPES,
-        }
+    user = UserIdentity(
+        id=new_account.id,
+        email=new_account.email,
+        scope=DEFAULT_SCOPES,
     )
 
     refresh_token = create_new_refresh_token(user)
@@ -147,12 +144,10 @@ async def complete_webauthn_registration(
         logger.debug(f"WebAuthn registration failed: {e}")
         raise BadRequest
 
-    user = User(
-        {
-            "id": account.id,
-            "email": account.email,
-            "scope": DEFAULT_SCOPES,
-        }
+    user = UserIdentity(
+        id=account.id,
+        email=account.email,
+        scope=DEFAULT_SCOPES,
     )
 
     now = get_now(seconds_only=True)
@@ -236,12 +231,10 @@ async def complete_webauthn_authentication(
     account = check_not_found(
         await account_service.get_account(account_id, with_credentials=True)
     )
-    user = User(
-        {
-            "id": account.id,
-            "email": account.email,
-            "scope": DEFAULT_SCOPES,
-        }
+    user = UserIdentity(
+        id=account.id,
+        email=account.email,
+        scope=DEFAULT_SCOPES,
     )
 
     now = get_now(seconds_only=True)

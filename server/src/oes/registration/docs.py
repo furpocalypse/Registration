@@ -61,7 +61,7 @@ docs.components.security_schemes = {
                     "one's own registrations.",
                 },
                 refresh_url="/auth/token",
-                token_url="/auth/new-account",
+                token_url="/auth/account/create",
             )
         )
     ),
