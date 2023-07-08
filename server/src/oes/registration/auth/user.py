@@ -53,7 +53,8 @@ class UserIdentity(Identity, User):
                 "id": id,
                 "email": email,
                 "scope": scope if scope is not None else Scopes(),
-            }
+            },
+            "Bearer",
         )
 
     @property

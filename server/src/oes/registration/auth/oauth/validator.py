@@ -133,6 +133,12 @@ class CustomValidator(RequestValidator):
                 self._credential_service.update_credential(entity), self._loop
             )
             fut.result()
+            token["email"] = request.refresh_token.email
+            token["account_id"] = (
+                str(UUID(request.refresh_token.sub))
+                if request.refresh_token.sub
+                else None
+            )
         return None
 
     def validate_bearer_token(

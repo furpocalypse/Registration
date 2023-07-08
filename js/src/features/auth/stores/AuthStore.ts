@@ -1,11 +1,8 @@
-import { action, makeObservable, observable, runInAction } from "mobx"
+import { action, makeAutoObservable, runInAction, when } from "mobx"
 import * as oauth from "oauth4webapi"
-import * as yup from "yup"
 import { Wretch } from "wretch"
-import {
-  getAccessTokenMiddleware,
-  getRetryMiddleware,
-} from "#src/features/auth/authMiddleware.js"
+import { getRetryMiddleware } from "#src/features/auth/authMiddleware.js"
+import { AuthInfo } from "#src/features/auth/stores/AuthInfo.js"
 
 /**
  * The client ID of the main JS app.
@@ -22,151 +19,24 @@ const REDIRECT_URI = "/auth/redirect"
  */
 const LOCAL_STORAGE_KEY = "oes-auth-data-v1"
 
-const authInfoSchema = yup.object({
-  tokenType: yup.string().defined(),
-  accessToken: yup.string().defined(),
-  refreshToken: yup.string().nullable(),
-  expiresAt: yup.number().nullable(),
-  scope: yup.string().nullable(),
-})
-
 /**
- * Store auth information.
+ * Stores auth status/tokens.
  */
-export class AuthInfo {
-  constructor(
-    private _tokenType: string,
-    private _accessToken: string,
-    private _refreshToken: string | null = null,
-    private _expiresAt: number | null = null,
-    private _scope: string | null = null
-  ) {}
-
-  /**
-   * The access token.
-   */
-  get accessToken(): string {
-    return this._accessToken
-  }
-
-  /**
-   * The refresh token.
-   */
-  get refreshToken(): string | null {
-    return this._refreshToken
-  }
-
-  /**
-   * The access token expiration date.
-   */
-  get expiresAt(): Date | null {
-    if (this._expiresAt != null) {
-      return new Date(this._expiresAt * 1000)
-    } else {
-      return null
-    }
-  }
-
-  /**
-   * The scope.
-   */
-  get scope(): string | null {
-    return this._scope
-  }
-
-  /**
-   * Create a {@link AuthInfo} from a token endpoint response.
-   */
-  static createFromResponse(response: oauth.TokenEndpointResponse): AuthInfo {
-    let expiresAt = null
-    if (response.expires_in != null) {
-      const now = Math.floor(new Date().getTime() / 1000)
-      expiresAt = now + response.expires_in
-    }
-
-    return new AuthInfo(
-      response.token_type,
-      response.access_token,
-      response.refresh_token ?? null,
-      expiresAt,
-      response.scope ?? null
-    )
-  }
-
-  /**
-   * Parse a {@link AuthInfo} from an object.
-   *
-   * @returns A {@link AuthInfo} object, or null if it could not be parsed.
-   */
-  static createFromObject(obj: object): AuthInfo | null {
-    try {
-      const parsed = authInfoSchema.validateSync(obj)
-      return new AuthInfo(
-        parsed.tokenType,
-        parsed.accessToken,
-        parsed.refreshToken ?? null,
-        parsed.expiresAt ?? null,
-        parsed.scope ?? null
-      )
-    } catch (_) {
-      return null
-    }
-  }
-
-  /**
-   * Return whether the access token is expired.
-   */
-  getIsExpired(): boolean {
-    const now = Math.floor(new Date().getTime() / 1000)
-    return this._expiresAt != undefined && now >= this._expiresAt
-  }
-
-  toJSON() {
-    return {
-      tokenType: this._tokenType,
-      accessToken: this._accessToken,
-      refreshToken: this._refreshToken,
-      expiresAt: this._expiresAt,
-      scope: this._scope,
-    }
-  }
-}
-
 export class AuthStore {
-  private _authWretch: Wretch
+  /**
+   * A {@link Wretch} with auth middlewares added.
+   */
+  authWretch: Wretch
+
+  private authInfo: AuthInfo | null = null
+  private authInfoPromise: Promise<AuthInfo | null> = Promise.resolve(null)
 
   private client: oauth.Client
   private authServer: oauth.AuthorizationServer
 
-  private authInfo: AuthInfo | null = null
-  private _loaded = false
-  private _invalid = false
-
-  /**
-   * A {@link Wretch} instance with authorization features added.
-   */
-  get authWretch(): Wretch {
-    return this._authWretch
-  }
-
-  /**
-   * Whether the auth status has been loaded.
-   */
-  get loaded(): boolean {
-    return this._loaded
-  }
-
-  /**
-   * The current access token.
-   */
-  get accessToken(): string | null {
-    return this.authInfo?.accessToken ?? null
-  }
-
   constructor(serverBaseURL: URL, public wretch: Wretch) {
-    this._authWretch = wretch.middlewares([
-      getRetryMiddleware(this),
-      getAccessTokenMiddleware(serverBaseURL, this),
+    this.authWretch = wretch.middlewares([
+      getRetryMiddleware(serverBaseURL, this),
     ])
 
     this.client = {
@@ -184,14 +54,11 @@ export class AuthStore {
       token_endpoint: `${baseURLStr}/auth/token`,
     }
 
-    makeObservable<this, "authInfo" | "_loaded" | "_invalid">(this, {
-      authInfo: observable.ref,
-      _loaded: observable,
-      _invalid: observable,
-      setup: action,
-      setAuthInfo: action,
-      markInvalid: action,
-      refresh: action,
+    makeAutoObservable<this, "client" | "authServer">(this, {
+      wretch: false,
+      authWretch: false,
+      client: false,
+      authServer: false,
     })
 
     // update the auth info if another window updates it in storage
@@ -200,11 +67,8 @@ export class AuthStore {
         try {
           const obj = JSON.parse(e.newValue)
           const loaded = AuthInfo.createFromObject(obj)
-          if (loaded) {
-            runInAction(() => {
-              this.authInfo = loaded
-              this._invalid = false
-            })
+          if (loaded && !loaded.getIsExpired()) {
+            this.setAuthInfo(loaded)
           }
         } catch (_) {
           // ignore
@@ -214,71 +78,111 @@ export class AuthStore {
   }
 
   /**
-   * Get whether the client is authorized/has a valid access token.
+   * The current access token.
    */
-  getIsAuthorized(): boolean {
-    return (
-      this._loaded &&
-      !!this.authInfo?.accessToken &&
-      !this.authInfo.getIsExpired() &&
-      !this._invalid
-    )
+  get accessToken(): string | null {
+    return this.authInfo?.accessToken ?? null
   }
 
   /**
-   * Set up the auth store.
+   * The current email.
    */
-  async setup() {
+  get email(): string | null {
+    return this.authInfo?.email ?? null
+  }
+
+  /**
+   * The current access token scope.
+   */
+  get scope(): string[] | null {
+    if (this.authInfo?.scope != null) {
+      return this.authInfo.scope.split(" ")
+    } else {
+      return null
+    }
+  }
+
+  /**
+   * Get a promise that resolves to an {@link AuthInfo}.
+   */
+  async getAuthInfo(): Promise<AuthInfo> {
+    let promise = this.authInfoPromise
+    let authInfo = await promise
+    while (!authInfo) {
+      await when(() => this.authInfoPromise != promise)
+      promise = this.authInfoPromise
+      authInfo = await promise
+    }
+
+    return authInfo
+  }
+
+  /**
+   * Set the current {@link AuthInfo}.
+   */
+  setAuthInfo(authInfo: AuthInfo | null): Promise<AuthInfo | null> {
+    this.authInfoPromise = this.authInfoPromise.then(
+      action(() => {
+        this.authInfo = authInfo
+        saveAuthInfo(authInfo)
+        return authInfo
+      })
+    )
+    return this.authInfoPromise
+  }
+
+  /**
+   * Load a saved token from storage.
+   * @returns The loaded token, or null if not found/not usable.
+   */
+  async load(): Promise<AuthInfo | null> {
     const loaded = loadAuthInfo()
     if (loaded) {
-      if (!loaded.getIsExpired()) {
-        this.authInfo = loaded
-      } else if (loaded.refreshToken) {
-        await this.refresh()
+      if (loaded.getIsExpired()) {
+        const refreshed = await this._refresh(loaded)
+        if (refreshed) {
+          await this.setAuthInfo(refreshed)
+        }
+        return refreshed
+      } else {
+        await this.setAuthInfo(loaded)
+        return loaded
       }
-    }
-
-    runInAction(() => {
-      this._loaded = true
-    })
-  }
-
-  /**
-   * Set the {@link AuthInfo}.
-   */
-  setAuthInfo(authInfo: AuthInfo | null) {
-    this._invalid = false
-    this.authInfo = authInfo
-    saveAuthInfo(authInfo)
-  }
-
-  /**
-   * Mark the given access token as being invalid.
-   * @returns true if the state was updated, false if it was already marked invalid.
-   */
-  markInvalid(accessToken: string): boolean {
-    if (this.authInfo?.accessToken == accessToken && !this._invalid) {
-      this._invalid = true
-      return true
     } else {
-      return false
+      return null
     }
   }
 
   /**
-   * Attempt to use a refresh token.
-   * @returns A new {@link AuthInfo} or null if unsuccessful.
+   * Attempt to refresh the given {@link AuthInfo}.
    */
-  async refresh(): Promise<AuthInfo | null> {
-    if (!this.authInfo?.refreshToken) {
-      this.setAuthInfo(null)
+  async attemptRefresh(authInfo: AuthInfo): Promise<AuthInfo | null> {
+    this.authInfoPromise = this.authInfoPromise.then(async (curAuthInfo) => {
+      // bail if the current auth info was changed
+      if (curAuthInfo?.accessToken != authInfo.accessToken) {
+        return curAuthInfo
+      }
+
+      const refreshed = await this._refresh(curAuthInfo)
+      runInAction(() => {
+        this.authInfo = refreshed
+      })
+      saveAuthInfo(refreshed)
+      return refreshed
+    })
+    return this.authInfoPromise
+  }
+
+  /** OAuth refresh. */
+  private async _refresh(authToken: AuthInfo): Promise<AuthInfo | null> {
+    if (!authToken.refreshToken) {
       return null
     }
 
     const resp = await oauth.refreshTokenGrantRequest(
       this.authServer,
       this.client,
-      this.authInfo.refreshToken
+      authToken.refreshToken
     )
 
     const parsed = await oauth.processRefreshTokenResponse(
@@ -286,14 +190,12 @@ export class AuthStore {
       this.client,
       resp
     )
+
     if (oauth.isOAuth2Error(parsed)) {
-      this.setAuthInfo(null)
       return null
     }
 
-    const newAuthInfo = AuthInfo.createFromResponse(parsed)
-    this.setAuthInfo(newAuthInfo)
-    return newAuthInfo
+    return AuthInfo.createFromResponse(parsed)
   }
 }
 

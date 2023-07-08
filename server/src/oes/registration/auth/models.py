@@ -18,7 +18,7 @@ class CredentialType(str, Enum):
 class EmailAuthCodeHookBody:
     """Email auth code event data."""
 
-    email: str
+    to: str
     code: str
     num_sent: int
     attempts: int

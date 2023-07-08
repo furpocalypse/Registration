@@ -1,10 +1,21 @@
 """OAuth views."""
 import asyncio
+import re
+from typing import Optional
+from uuid import UUID
 
+import jwt
 from attrs import frozen
-from blacksheep import Content, FromForm, Request, Response, allow_anonymous
+from blacksheep import (
+    Content,
+    FromForm,
+    HTTPException,
+    Request,
+    Response,
+    allow_anonymous,
+)
 from blacksheep.exceptions import BadRequest, Forbidden, NotFound
-from blacksheep.server.openapi.common import RequestBodyInfo
+from blacksheep.server.openapi.common import RequestBodyInfo, ResponseInfo
 from loguru import logger
 from oes.registration.app import app
 from oes.registration.auth.account_service import AccountService
@@ -13,11 +24,16 @@ from oes.registration.auth.credential_service import (
     create_new_refresh_token,
     create_refresh_token_entity,
 )
+from oes.registration.auth.email_auth_service import EmailAuthService, send_auth_code
 from oes.registration.auth.models import CredentialType
 from oes.registration.auth.oauth.validator import CustomServer
 from oes.registration.auth.scope import DEFAULT_SCOPES
-from oes.registration.auth.token import WEBAUTHN_REFRESH_TOKEN_LIFETIME, TokenResponse
-from oes.registration.auth.user import UserIdentity
+from oes.registration.auth.token import (
+    WEBAUTHN_REFRESH_TOKEN_LIFETIME,
+    TokenResponse,
+    VerifiedEmailToken,
+)
+from oes.registration.auth.user import User, UserIdentity
 from oes.registration.auth.webauthn import (
     WebAuthnAuthenticationChallenge,
     WebAuthnError,
@@ -31,6 +47,45 @@ from oes.registration.docs import docs, docs_helper
 from oes.registration.models.config import Config
 from oes.registration.util import check_not_found, get_now, get_origin, origin_to_rp_id
 from oes.registration.views.parameters import AttrsBody
+from sqlalchemy.ext.asyncio import AsyncSession
+
+
+@frozen
+class AccountInfoResponse:
+    """Account info."""
+
+    id: Optional[UUID] = None
+    email: Optional[str] = None
+    scope: str = ""
+
+
+@frozen
+class EmailVerificationBody:
+    """An email verification request."""
+
+    email: str
+
+
+@frozen
+class EmailVerificationCodeBody:
+    """An email verification code."""
+
+    email: str
+    code: str
+
+
+@frozen
+class EmailVerificationTokenBody:
+    """An email verification token result."""
+
+    token: str
+
+
+@frozen
+class NewAccountBody:
+    """A request body to create a new account."""
+
+    email_token: Optional[str] = None
 
 
 @frozen
@@ -47,12 +102,83 @@ class WebAuthnChallengeResult:
 
     challenge: str
     result: str
+    email_token: Optional[str] = None
+
+
+@app.router.get("/auth/account")
+@docs_helper(
+    response_type=AccountInfoResponse,
+    response_summary="The account information",
+    tags=["Account"],
+)
+async def get_account_info(user: User) -> AccountInfoResponse:
+    """Get the current account info."""
+    return AccountInfoResponse(
+        id=user.id,
+        email=user.email,
+        scope=str(user.scope),
+    )
+
+
+@allow_anonymous()
+@app.router.post("/auth/email/send")
+@docs(
+    responses={
+        204: ResponseInfo(
+            "The email was sent.",
+        ),
+    },
+    tags=["Account"],
+)
+@transaction
+async def send_email_verification(
+    body: AttrsBody[EmailVerificationBody],
+    email_auth_service: EmailAuthService,
+    config: Config,
+) -> Response:
+    """Send an email verification code."""
+    email = body.value.email.strip()
+    if not re.match(r"^.+@.+\..+$", email):
+        raise HTTPException(422, "Invalid email")
+    await send_auth_code(email_auth_service, config.hooks, email)
+    return Response(204)
+
+
+@allow_anonymous()
+@app.router.post("/auth/email/verify")
+@docs_helper(
+    response_type=EmailVerificationTokenBody,
+    response_summary="The verified email token",
+    tags=["Account"],
+)
+async def verify_email(
+    body: AttrsBody[EmailVerificationCodeBody],
+    email_auth_service: EmailAuthService,
+    config: Config,
+    db: AsyncSession,
+) -> EmailVerificationTokenBody:
+    """Verify an email address."""
+    email = body.value.email.strip()
+    code = re.sub(r"[^a-zA-Z0-9]+", "", body.value.code)
+    entity = await email_auth_service.get_auth_code_for_email(email)
+    if not entity or not entity.get_is_usable():
+        raise Forbidden
+    elif code != entity.code:
+        entity.attempts += 1
+        await db.commit()
+        raise Forbidden
+    else:
+        token = VerifiedEmailToken.create(email).encode(key=config.auth.signing_key)
+        await email_auth_service.delete_code(entity)
+        await db.commit()
+        return EmailVerificationTokenBody(token=token)
 
 
 @allow_anonymous()
 @app.router.post("/auth/account/create")
 @docs_helper(
     response_type=TokenResponse,
+    response_summary="The token response for the new account",
     tags=["Account"],
 )
 @transaction
@@ -60,9 +186,11 @@ async def new_account_endpoint(
     account_service: AccountService,
     credential_service: CredentialService,
     config: Config,
+    body: Optional[AttrsBody[NewAccountBody]] = None,
 ) -> TokenResponse:
     """Create a new account, without credentials."""
-    new_account = await account_service.create_account(None)
+    email = _verify_email_token(body.value.email_token if body else None, config)
+    new_account = await account_service.create_account(email)
     user = UserIdentity(
         id=new_account.id,
         email=new_account.email,
@@ -89,6 +217,7 @@ async def new_account_endpoint(
 @app.router.get("/auth/webauthn/register")
 @docs_helper(
     response_type=WebAuthnChallengeResponse,
+    response_summary="The registration challenge",
     tags=["Account"],
 )
 async def get_webauthn_registration_challenge(
@@ -116,6 +245,7 @@ async def get_webauthn_registration_challenge(
 @app.router.post("/auth/webauthn/register")
 @docs_helper(
     response_type=TokenResponse,
+    response_summary="The token response for the new account",
     tags=["Account"],
 )
 @transaction
@@ -144,6 +274,9 @@ async def complete_webauthn_registration(
         logger.debug(f"WebAuthn registration failed: {e}")
         raise BadRequest
 
+    email = _verify_email_token(body.value.email_token, config)
+    account.email = email
+
     user = UserIdentity(
         id=account.id,
         email=account.email,
@@ -165,10 +298,22 @@ async def complete_webauthn_registration(
     )
 
 
+def _verify_email_token(token: Optional[str], config: Config) -> Optional[str]:
+    if not token:
+        return None
+
+    try:
+        decoded = VerifiedEmailToken.decode(token, key=config.auth.signing_key)
+        return decoded.email
+    except jwt.InvalidTokenError:
+        return None
+
+
 @allow_anonymous()
 @app.router.get("/auth/webauthn/authenticate/{credential_id}")
 @docs_helper(
     response_type=WebAuthnChallengeResponse,
+    response_summary="The authentication challenge",
     tags=["Account"],
 )
 async def get_webauthn_authentication_challenge(
@@ -203,6 +348,7 @@ async def get_webauthn_authentication_challenge(
 @app.router.post("/auth/webauthn/authenticate")
 @docs_helper(
     response_type=TokenResponse,
+    response_summary="The token response",
     tags=["Account"],
 )
 @transaction
@@ -270,6 +416,7 @@ async def complete_webauthn_authentication(
             }
         }
     ),
+    responses={200: ResponseInfo("The token response")},
     tags=["OAuth"],
 )
 @transaction

@@ -1,58 +1,52 @@
 import { AuthStore } from "#src/features/auth/stores/AuthStore.js"
-import { when } from "mobx"
 import { ConfiguredMiddleware } from "wretch"
-
-/**
- * Get a middleware to set the Authorization header.
- * @param baseURL - The server's base URL.
- * @param authStore - The {@link AuthStore}.
- */
-export const getAccessTokenMiddleware =
-  (baseURL: URL, authStore: AuthStore): ConfiguredMiddleware =>
-  (next) =>
-  async (url, opts) => {
-    const urlObj = new URL(url, window.location.href)
-    if (urlObj.origin == baseURL.origin && authStore.accessToken) {
-      const newHeaders = new Headers(opts.headers)
-      newHeaders.set("Authorization", `Bearer ${authStore.accessToken}`)
-      return await next(url, { ...opts, headers: newHeaders })
-    } else {
-      return await next(url, opts)
-    }
-  }
 
 /**
  * Get middleware that will retry requests on 401 Unauthorized errors.
  * @param AuthStore - The {@link AuthStore}.
  */
 export const getRetryMiddleware =
-  (authStore: AuthStore): ConfiguredMiddleware =>
+  (baseURL: URL, authStore: AuthStore): ConfiguredMiddleware =>
   (next) =>
   async (url, opts) => {
     for (;;) {
       // wait for an access token
-      const accessToken = authStore.accessToken
-      if (!accessToken) {
-        await when(() => !!authStore.accessToken)
-        continue
-      }
+      const authInfo = await authStore.getAuthInfo()
 
       // attempt to make the request and catch 401
-      const response = await next(url, opts)
-      if (response.status == 401) {
-        // only call once per token
-        if (
-          authStore.accessToken == accessToken &&
-          authStore.markInvalid(accessToken)
-        ) {
-          authStore.refresh()
-        }
+      const newOpts = setAuthHeader(baseURL, authInfo.accessToken, url, opts)
+      const response = await next(url, newOpts)
 
-        // wait for valid credentials before retrying
-        await when(() => authStore.getIsAuthorized())
+      if (response.status == 401) {
+        await authStore.attemptRefresh(authInfo)
         continue
       } else {
         return response
       }
     }
   }
+
+/**
+ * Get a {@link RequestInit} with the Authorization header set.
+ * @param baseURL - The base URL of the server.
+ * @param accessToken - The access token.
+ * @param url - The request URL.
+ * @param opts - The current options.
+ * @returns Updated {@link RequestInit} options.
+ */
+export const setAuthHeader = (
+  baseURL: URL,
+  accessToken: string | null | undefined,
+  url: string,
+  opts: RequestInit
+): RequestInit => {
+  const urlObj = new URL(url, window.location.href)
+
+  if (urlObj.origin == baseURL.origin && accessToken) {
+    const newHeaders = new Headers(opts.headers)
+    newHeaders.set("Authorization", `Bearer ${accessToken}`)
+    return { ...opts, headers: newHeaders }
+  } else {
+    return opts
+  }
+}

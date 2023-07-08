@@ -20,6 +20,7 @@ import { SigninDialogProps } from "#src/features/auth/components/SigninDialog.js
 import { CheckoutDialogProps } from "#src/features/checkout/components/checkout/CheckoutDialog.js"
 import { OptionsDialogProps } from "#src/features/selfservice/components/options/OptionsDialog.js"
 import { LogoProps } from "#src/components/layout/Logo.js"
+import { EmailAuthProps } from "#src/features/auth/components/EmailAuth.js"
 
 interface Components {
   // src/components
@@ -31,6 +32,7 @@ interface Components {
   TitleArea: TitleAreaProps
 
   // src/features/auth/components
+  EmailAuth: EmailAuthProps
   SigninDialog: SigninDialogProps
 
   // src/features/cart/components

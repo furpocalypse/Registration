@@ -26,6 +26,9 @@ DEFAULT_REFRESH_TOKEN_LIFETIME = timedelta(days=90)
 WEBAUTHN_REFRESH_TOKEN_LIFETIME = timedelta(hours=1)
 """Default refresh token lifetime for WebAuthn."""
 
+VERIFIED_EMAIL_TOKEN_LIFETIME = timedelta(minutes=5)
+"""How long an email verification token is vaild."""
+
 converter = make_converter()
 """A converter for tokens."""
 
@@ -227,6 +230,23 @@ class RefreshToken(TokenBase):
 
 
 @frozen(kw_only=True)
+class VerifiedEmailToken(TokenBase):
+    """Verified email token."""
+
+    typ: Literal["ve"]
+    email: str
+
+    @classmethod
+    def create(cls, email: str) -> Self:
+        """Create a :class:`VerifiedEmailToken`."""
+        return cls(
+            typ="ve",
+            email=email,
+            exp=get_now(seconds_only=True) + VERIFIED_EMAIL_TOKEN_LIFETIME,
+        )
+
+
+@frozen(kw_only=True)
 class TokenResponse:
     """An OAuth token response."""
 
@@ -235,6 +255,8 @@ class TokenResponse:
     expires_in: Optional[int] = None
     refresh_token: Optional[str] = None
     scope: Optional[str] = None
+    account_id: Optional[str] = None
+    email: Optional[str] = None
 
     @classmethod
     def create(
@@ -267,6 +289,10 @@ class TokenResponse:
             access_token=enc_access_token,
             refresh_token=enc_refresh_token,
             scope=_scope_to_str(scope),
+            email=access_token.email if access_token else None,
+            account_id=str(UUID(access_token.sub))
+            if access_token and access_token.sub
+            else None,
             expires_in=_compute_expires_in(expires_in, access_token),
         )
 

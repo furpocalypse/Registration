@@ -11,7 +11,10 @@ import { AppStore } from "#src/stores/AppStore.js"
 import { ReactNode } from "react"
 
 export const AppProvider = ({ children }: { children?: ReactNode }) => {
-  const appStoreLoader = useLoader(() => AppStore.fromConfig())
+  const appStoreLoader = useLoader(async () => {
+    const app = await AppStore.fromConfig()
+    return app
+  })
 
   return (
     <appStoreLoader.Component

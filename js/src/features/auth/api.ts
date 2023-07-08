@@ -1,4 +1,8 @@
 import {
+  AccountInfo,
+  EmailTokenResponse,
+} from "#src/features/auth/types/AccountInfo.js"
+import {
   WebAuthnChallenge,
   WebAuthnChallengeResult,
 } from "#src/features/auth/types/WebAuthn.js"
@@ -6,13 +10,54 @@ import * as oauth from "oauth4webapi"
 import { Wretch } from "wretch"
 
 /**
+ * Get the current account information.
+ */
+export const getAccountInfo = async (wretch: Wretch): Promise<AccountInfo> => {
+  return await wretch.url("/auth/account").get().json<AccountInfo>()
+}
+
+/**
+ * Send a verification code to the given email.
+ */
+export const sendVerificationEmail = async (
+  wretch: Wretch,
+  email: string
+): Promise<void> => {
+  return await wretch
+    .url("/auth/email/send")
+    .json({ email: email })
+    .post()
+    .res()
+}
+
+/**
+ * Verify an email.
+ */
+export const verifyEmail = async (
+  wretch: Wretch,
+  email: string,
+  code: string
+): Promise<EmailTokenResponse | null> => {
+  return await wretch
+    .url("/auth/email/verify")
+    .json({ email: email, code: code })
+    .post()
+    .forbidden(() => null)
+    .json<EmailTokenResponse>()
+}
+
+/**
  * Create a new account without credentials.
  */
 export const createAccount = async (
-  wretch: Wretch
+  wretch: Wretch,
+  emailToken?: string | null
 ): Promise<oauth.TokenEndpointResponse> => {
   return await wretch
     .url("/auth/account/create")
+    .json({
+      email_token: emailToken ?? null,
+    })
     .post()
     .json<oauth.TokenEndpointResponse>()
 }
