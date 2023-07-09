@@ -21,12 +21,12 @@ from cattrs import BaseValidationError
 from oes.interview.response import IncompleteInterviewStateResponse
 from oes.interview.state import InvalidStateError
 from oes.registration.app import app
-from oes.registration.auth import RequireAdmin, RequireCart, RequireSelfService
+from oes.registration.auth.handlers import RequireAdmin, RequireCart, RequireSelfService
+from oes.registration.auth.user import User
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper, serialize
 from oes.registration.entities.cart import CartEntity
 from oes.registration.entities.registration import RegistrationEntity
-from oes.registration.models.auth import User
 from oes.registration.models.cart import CartData, CartError, CartRegistration
 from oes.registration.models.config import Config
 from oes.registration.models.event import Event, EventConfig
@@ -405,7 +405,7 @@ async def _get_registration_for_change(
 
     # Check that the user account is assocated with this registration
     # TODO: check emails also
-    if user.id not in [a.id for a in reg.accounts]:
+    if not user.id or user.id not in [a.id for a in reg.accounts]:
         raise NotFound
 
     return reg
@@ -441,7 +441,7 @@ def _get_interview_initial_data(
             {
                 "account_id": str(user.id),
             }
-            if user
+            if user and user.id
             else {}
         )
 

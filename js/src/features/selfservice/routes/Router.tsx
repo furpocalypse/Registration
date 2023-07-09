@@ -1,6 +1,6 @@
 import { SimpleLayout } from "#src/components/layout/SimpleLayout.js"
 import { SigninDialogManager } from "#src/features/auth/components/SigninDialogManager.js"
-import { useAuth } from "#src/features/auth/hooks.js"
+import { useAccountStore } from "#src/features/auth/hooks.js"
 import { useCurrentCartStore } from "#src/features/cart/hooks.js"
 import {
   CartStoreProvider,
@@ -41,7 +41,7 @@ const SelfServiceLoader = ({
   eventId: string
 }) => {
   const wretch = useWretch()
-  const authStore = useAuth()
+  const accountStore = useAccountStore()
   const eventStore = useEvents()
   const currentCartStore = useCurrentCartStore()
   const selfServiceLoader = useLoader(() =>
@@ -49,8 +49,7 @@ const SelfServiceLoader = ({
   )
 
   const loader = useLoader(async () => {
-    await authStore.setup()
-
+    await accountStore.setup()
     const event = await eventStore.load(eventId)
     if (!event) {
       return null

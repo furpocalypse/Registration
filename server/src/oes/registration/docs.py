@@ -7,7 +7,7 @@ from typing import Any, Optional, Type, TypeVar, Union, cast, get_args, get_orig
 from attrs import Attribute, fields
 from blacksheep.server.openapi.common import ContentInfo, ResponseInfo
 from blacksheep.server.openapi.v3 import FieldInfo, ObjectTypeHandler, OpenAPIHandler
-from oes.registration.models.auth import Scope
+from oes.registration.auth.scope import Scope
 from oes.registration.serialization import get_converter
 from openapidocs.v3 import (
     HTTPSecurity,
@@ -61,7 +61,7 @@ docs.components.security_schemes = {
                     "one's own registrations.",
                 },
                 refresh_url="/auth/token",
-                token_url="/auth/new-account",
+                token_url="/auth/account/create",
             )
         )
     ),

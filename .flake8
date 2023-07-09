@@ -8,6 +8,8 @@ allow-untyped-nested = true
 mypy-init-return = true
 
 extend-ignore =
+    E203,
+
     # ignore annotations on cls, self, and "protected" functions
     ANN101,
     ANN102,

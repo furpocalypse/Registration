@@ -16,6 +16,7 @@ from oes.hook import (
     python_hook_factory,
 )
 from oes.registration.http_client import get_http_client
+from oes.registration.serialization.json import json_dumps
 from typing_extensions import assert_never
 
 RETRY_SECONDS = (
@@ -36,6 +37,9 @@ NUM_RETRIES = len(RETRY_SECONDS)
 
 class HookEvent(str, Enum):
     """Hook event types."""
+
+    email_auth_code = "email.auth_code"
+    """An email auth code is generated."""
 
     registration_created = "registration.created"
     """A registration is created or transitions to the ``created`` state."""
@@ -77,7 +81,12 @@ HookConfigObject = Union[
 
 async def _http_func(body: Any, config: HttpHookConfig) -> Any:
     client = get_http_client()
-    response = await client.post(config.url, json=body)
+    json_data = json_dumps(body)
+    response = await client.post(
+        config.url,
+        content=json_data,
+        headers={"Content-Type": "application/json"},
+    )
     response.raise_for_status()
     if response.status_code == 204:
         return None

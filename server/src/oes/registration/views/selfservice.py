@@ -3,9 +3,9 @@ from typing import Optional
 
 from blacksheep import FromQuery, auth
 from oes.registration.app import app
-from oes.registration.auth import RequireSelfService
+from oes.registration.auth.handlers import RequireSelfService
+from oes.registration.auth.user import User
 from oes.registration.docs import docs_helper
-from oes.registration.models.auth import User
 from oes.registration.models.event import EventConfig
 from oes.registration.services.registration import (
     RegistrationService,
@@ -41,9 +41,15 @@ async def list_self_service_registration(
     else:
         add_options = []
 
-    registrations = await service.list_self_service_registrations(
-        user.id,
-        event_id=event_id.value,
+    registrations = (
+        (
+            await service.list_self_service_registrations(
+                user.id,
+                event_id=event_id.value,
+            )
+        )
+        if user.id
+        else []
     )
 
     results = []

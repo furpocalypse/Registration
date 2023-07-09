@@ -29,7 +29,7 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 if TYPE_CHECKING:
-    from oes.registration.entities.auth import AccountEntity
+    from oes.registration.auth.entities import AccountEntity
     from oes.registration.models.cart import CartRegistration, InvalidChangeError
 
 

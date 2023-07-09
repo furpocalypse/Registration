@@ -15,6 +15,9 @@ configs:
   interviews:
     # Must be made readable by uid or gid 1000
     file: ./interviews.yml
+  webhooks:
+    # Must be made readable by uid or gid 1000
+    file: ./webhooks.yml
   client:
     # Must be made readable by uid or gid 101
     file: ./config.json
@@ -86,6 +89,14 @@ services:
     secrets:
       - source: interview-encryption-key
         target: /config/encryption_key
+
+  webhooks:
+    image: ghcr.io/open-event-systems/webhooks:latest
+    networks:
+      - server
+    configs:
+      - source: webhooks
+        target: /config/config.yml
 
   client:
     build:

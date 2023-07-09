@@ -15,12 +15,13 @@ from blacksheep.exceptions import NotFound
 from blacksheep.server.openapi.common import ContentInfo, ResponseInfo
 from loguru import logger
 from oes.registration.app import app
-from oes.registration.auth import RequireCart
+from oes.registration.auth.account_service import AccountService
+from oes.registration.auth.handlers import RequireCart
+from oes.registration.auth.user import User
 from oes.registration.database import transaction
 from oes.registration.docs import docs, docs_helper
 from oes.registration.entities.checkout import CheckoutEntity, CheckoutState
 from oes.registration.hook.service import HookSender
-from oes.registration.models.auth import User
 from oes.registration.models.cart import CartData
 from oes.registration.models.config import Config
 from oes.registration.models.event import EventConfig
@@ -32,7 +33,6 @@ from oes.registration.payment.base import (
     ValidationError,
 )
 from oes.registration.serialization import get_converter
-from oes.registration.services.auth import AuthService
 from oes.registration.services.cart import (
     CartService,
     price_cart,
@@ -216,7 +216,7 @@ async def update_checkout(
     body: FromJSON[dict],
     checkout_service: CheckoutService,
     registration_service: RegistrationService,
-    auth_service: AuthService,
+    account_service: AccountService,
     event_service: EventService,
     events: EventConfig,
     hook_sender: HookSender,
@@ -255,7 +255,7 @@ async def update_checkout(
     try:
         response = await _handle_update(
             registration_service,
-            auth_service,
+            account_service,
             event_service,
             checkout,
             result,
@@ -288,7 +288,7 @@ def _validate_checkout_and_event(
 
 async def _handle_update(
     registration_service: RegistrationService,
-    auth_service: AuthService,
+    account_service: AccountService,
     event_service: EventService,
     checkout_entity: CheckoutEntity,
     checkout_result: PaymentServiceCheckout,
@@ -300,7 +300,7 @@ async def _handle_update(
     ):
         updated = await apply_checkout_changes(
             registration_service,
-            auth_service,
+            account_service,
             checkout_entity,
             hook_sender,
         )
