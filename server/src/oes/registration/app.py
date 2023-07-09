@@ -4,6 +4,7 @@ from asyncio import get_running_loop
 from functools import partial
 from ipaddress import IPv4Network, IPv6Network
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 from blacksheep import Application, Content, HTTPException, Request, Response
@@ -11,6 +12,7 @@ from blacksheep.plugins import json
 from blacksheep.server.remotes.forwarding import XForwardedHeadersMiddleware
 from guardpost import Policy
 from guardpost.common import AuthenticatedRequirement
+from httpx import AsyncClient
 from loguru import logger
 from oes.registration.auth.account_service import AccountService
 from oes.registration.auth.credential_service import CredentialService
@@ -113,7 +115,7 @@ app.exceptions_handlers[409] = _conflict_error_handler
 app.middlewares.append(db_session_middleware)
 
 
-async def _set_contexts(request, handler, client):
+async def _set_contexts(request: Request, handler: Any, client: AsyncClient):
     """Middleware to set values in context.
 
     The HTTP framework doesn't seem to copy the context set during setup...
