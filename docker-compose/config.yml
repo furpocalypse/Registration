@@ -41,10 +41,12 @@ interview:
 # Hook configuration
 hooks:
   # Events and hooks
-  hooks: []
+  hooks:
+    - on: email.auth_code
+      hook:
+        url: http://webhooks:8080/email/code
 
-  # Example:
-  # hooks:
+  # Examples
   #   - on: registration.created
   #     hook:
   #       url: http://localhost:8080/my-webhook

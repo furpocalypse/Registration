@@ -7,7 +7,7 @@ should not be directly used in production.
 **Permissions Caveat**: Because configuration files are bind mounted into the
 containers, their permissions in the host filesystem need to be set appropriately:
 
-- `config.yml`, `events.yml` - readable by UID or GID 1000
+- `config.yml`, `events.yml`, `webhooks.yml` - readable by UID or GID 1000
 - `config.json` - readable by UID or GID 101
 - `example-interview-encryption-key` - readable by UID or GID 1000
 
