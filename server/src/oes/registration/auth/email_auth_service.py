@@ -73,7 +73,7 @@ async def send_auth_code(
 
     body = EmailAuthCodeHookBody(
         to=email,
-        code=entity.code,
+        code=_format_code(entity.code),
         num_sent=entity.num_sent,
         attempts=entity.attempts,
         date_created=entity.date_created,
@@ -93,3 +93,10 @@ async def send_auth_code(
 
     if i == 0:
         logger.error("No email auth hooks were run")
+
+
+def _format_code(code: str) -> str:
+    parts = []
+    for i in range(0, len(code), 3):
+        parts.append(code[i : i + 3])
+    return " ".join(parts)

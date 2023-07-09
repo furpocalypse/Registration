@@ -35,7 +35,11 @@ from oes.registration.hook.service import (
     HookSender,
     HookService,
 )
-from oes.registration.http_client import setup_http_client, shutdown_http_client
+from oes.registration.http_client import (
+    http_client_context,
+    setup_http_client,
+    shutdown_http_client,
+)
 from oes.registration.log import setup_logging
 from oes.registration.models.config import Config
 from oes.registration.payment.config import load_services
@@ -107,6 +111,21 @@ async def _conflict_error_handler(
 app.exceptions_handlers[BodyValidationError] = _validation_error_handler
 app.exceptions_handlers[409] = _conflict_error_handler
 app.middlewares.append(db_session_middleware)
+
+
+async def _set_contexts(request, handler, client):
+    """Middleware to set values in context.
+
+    The HTTP framework doesn't seem to copy the context set during setup...
+    """
+    token = http_client_context.set(client)
+    try:
+        return await handler(request)
+    finally:
+        http_client_context.reset(token)
+
+
+app.middlewares.append(_set_contexts)
 
 
 async def _set_base_path(request, handler):
