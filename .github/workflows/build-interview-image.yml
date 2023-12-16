@@ -5,6 +5,7 @@ on:
       - python/interview/**
     branches:
       - monorepo
+  workflow_dispatch:
 jobs:
   build:
     runs-on: ubuntu-latest
