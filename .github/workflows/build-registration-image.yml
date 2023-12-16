@@ -33,7 +33,7 @@ jobs:
 
       - uses: docker/build-push-action@v4.1.1
         with:
-          context: python
+          context: python/registration
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
