@@ -4,6 +4,7 @@ from inspect import iscoroutinefunction
 from typing import Optional
 from uuid import UUID
 
+from oes.registration.auth.account_service import AccountService
 from oes.registration.entities.cart import CartEntity
 from oes.registration.entities.registration import RegistrationEntity
 from oes.registration.hook.models import HookConfig, HookEvent
@@ -18,7 +19,6 @@ from oes.registration.models.pricing import (
 )
 from oes.registration.pricing import default_pricing
 from oes.registration.serialization import get_converter
-from oes.registration.services.auth import AuthService
 from oes.registration.services.registration import (
     RegistrationService,
     add_account_to_registration,
@@ -141,7 +141,7 @@ async def validate_changes_apply(
 
 async def apply_changes(
     registration_service: RegistrationService,
-    auth_service: AuthService,
+    account_service: AccountService,
     cart_data: CartData,
     hook_sender: HookSender,
 ) -> list[RegistrationEntity]:
@@ -149,7 +149,7 @@ async def apply_changes(
 
     Args:
         registration_service: The :class:`RegistrationService`.
-        auth_service: The :class:`AuthService`.
+        account_service: The :class:`AccountService`.
         cart_data: The :class:`CartData` to apply.
         hook_sender: A :class:`HookSender` instance.
 
@@ -177,7 +177,7 @@ async def apply_changes(
             # TODO: should we check if the old_data is blank?
             registration_entity = RegistrationEntity.create_from_cart(cart_registration)
             await registration_service.create_registration(registration_entity)
-            await _add_account(cart_registration, registration_entity, auth_service)
+            await _add_account(cart_registration, registration_entity, account_service)
 
         results.append(registration_entity)
 
@@ -187,7 +187,7 @@ async def apply_changes(
 async def _add_account(
     cart_registration: CartRegistration,
     entity: RegistrationEntity,
-    service: AuthService,
+    service: AccountService,
 ):
     """Associate the registration with the account ID in the metadata."""
     meta = cart_registration.meta or {}

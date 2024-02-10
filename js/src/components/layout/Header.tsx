@@ -1,6 +1,9 @@
+import { UserMenu } from "#src/components/layout/UserMenu.js"
+import { useAuth } from "#src/features/auth/hooks.js"
 import {
   ActionIcon,
   ActionIconProps,
+  Box,
   DefaultProps,
   Selectors,
   createStyles,
@@ -11,6 +14,7 @@ import {
   HeaderProps as MantineHeaderProps,
 } from "@mantine/core"
 import { IconHome } from "@tabler/icons-react"
+import { observer } from "mobx-react-lite"
 import { ComponentType, ReactNode } from "react"
 
 const useStyles = createStyles((theme) => ({
@@ -21,9 +25,13 @@ const useStyles = createStyles((theme) => ({
     paddingRight: "1rem",
     background: theme.fn.primaryColor(),
     borderBottom: `${theme.fn.lighten(theme.fn.primaryColor(), 0.2)} solid 1px`,
+    color: theme.white,
   },
   homeIcon: {
-    color: theme.white,
+    color: "inherit",
+  },
+  content: {
+    flex: "auto",
   },
 }))
 
@@ -35,7 +43,7 @@ export type HeaderProps = {
 } & Omit<MantineHeaderProps, "height" | "children" | "styles"> &
   DefaultProps<Selectors<typeof useStyles>>
 
-export const Header = (props: HeaderProps) => {
+export const Header = observer((props: HeaderProps) => {
   const {
     className,
     classNames,
@@ -54,6 +62,21 @@ export const Header = (props: HeaderProps) => {
     unstyled,
     classNames,
   })
+
+  const authStore = useAuth()
+
+  let userMenu
+
+  if (authStore.accessToken) {
+    userMenu = (
+      <UserMenu
+        username={authStore.email || "Guest"}
+        onSignOut={() => {
+          authStore.setAuthInfo(null)
+        }}
+      />
+    )
+  }
 
   return (
     <MantineHeader
@@ -80,7 +103,10 @@ export const Header = (props: HeaderProps) => {
           <IconHome />
         )}
       </ActionIcon>
-      {children}
+      <Box className={classes.content}>{children}</Box>
+      {userMenu}
     </MantineHeader>
   )
-}
+})
+
+Header.displayName = "Header"

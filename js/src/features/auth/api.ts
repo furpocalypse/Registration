@@ -1,70 +1,65 @@
 import {
-  AuthStatusResponse,
-  TokenResponse,
-} from "#src/features/auth/types/AuthData.js"
+  AccountInfo,
+  EmailTokenResponse,
+} from "#src/features/auth/types/AccountInfo.js"
 import {
-  CreateWebAuthnRegistrationRequest,
-  WebAuthChallenge,
-  WebAuthnAuthenticationRequest,
+  WebAuthnChallenge,
+  WebAuthnChallengeResult,
 } from "#src/features/auth/types/WebAuthn.js"
+import * as oauth from "oauth4webapi"
 import { Wretch } from "wretch"
-import { formUrlAddon, queryStringAddon } from "wretch/addons"
 
 /**
- * Check the status of the given access token.
- * @param wretch - The {@link Wretch} instance, which should not have any auth settings
- *   configured.
- * @param accessToken - The access token to check.
- * @returns A {@link AuthStatusResponse} or `null` if not valid.
+ * Get the current account information.
  */
-export const checkAuthStatus = async (
-  wretch: Wretch,
-  accessToken: string
-): Promise<AuthStatusResponse | null> => {
-  const res = await wretch
-    .url("/auth/current")
-    .headers({
-      Authorization: `Bearer ${accessToken}`,
-    })
-    .get()
-    .unauthorized(() => {
-      return null
-    })
-    .forbidden(() => {
-      return null
-    })
-    .json<AuthStatusResponse>()
-
-  return res
+export const getAccountInfo = async (wretch: Wretch): Promise<AccountInfo> => {
+  return await wretch.url("/auth/account").get().json<AccountInfo>()
 }
 
 /**
- * Use a refresh token for a new access token.
- * @param wretch - The {@link Wretch} instance, which should not have any auth settings.
- * @param refreshToken - The refresh token.
- * @returns The new token response, or `null` if the refresh failed.
+ * Send a verification code to the given email.
  */
-export const refreshAccessToken = async (
+export const sendVerificationEmail = async (
   wretch: Wretch,
-  refreshToken: string
-): Promise<TokenResponse | null> => {
+  email: string
+): Promise<void> => {
   return await wretch
-    .addon(formUrlAddon)
-    .formUrl({
-      grant_type: "refresh_token",
-      refresh_token: refreshToken,
-    })
-    .url("/auth/token")
+    .url("/auth/email/send")
+    .json({ email: email })
     .post()
-    .unauthorized(() => null)
-    .json<TokenResponse | null>()
+    .res()
 }
 
 /**
- * Create a new account.
+ * Verify an email.
  */
-export const createAccount = async (wretch: Wretch): Promise<TokenResponse> => {
-  return await wretch.url("/auth/new-account").post().json<TokenResponse>()
+export const verifyEmail = async (
+  wretch: Wretch,
+  email: string,
+  code: string
+): Promise<EmailTokenResponse | null> => {
+  return await wretch
+    .url("/auth/email/verify")
+    .json({ email: email, code: code })
+    .post()
+    .forbidden(() => null)
+    .json<EmailTokenResponse>()
+}
+
+/**
+ * Create a new account without credentials.
+ */
+export const createAccount = async (
+  wretch: Wretch,
+  emailToken?: string | null
+): Promise<oauth.TokenEndpointResponse> => {
+  return await wretch
+    .url("/auth/account/create")
+    .json({
+      email_token: emailToken ?? null,
+    })
+    .post()
+    .json<oauth.TokenEndpointResponse>()
 }
 
 /**
@@ -72,40 +67,39 @@ export const createAccount = async (wretch: Wretch): Promise<TokenResponse> => {
  */
 export const getWebAuthnRegistrationChallenge = async (
   wretch: Wretch
-): Promise<WebAuthChallenge> => {
+): Promise<WebAuthnChallenge> => {
   return await wretch
     .url("/auth/webauthn/register")
     .get()
-    .json<WebAuthChallenge>()
+    .json<WebAuthnChallenge>()
 }
 
 /**
- * Create a WebAuthn registration.
+ * Complete a WebAuthn registration.
  */
-export const createWebAuthnRegistration = async (
+export const completeWebAuthnRegistration = async (
   wretch: Wretch,
-  request: CreateWebAuthnRegistrationRequest
-): Promise<TokenResponse> => {
+  request: WebAuthnChallengeResult
+): Promise<oauth.TokenEndpointResponse | null> => {
   return await wretch
     .url("/auth/webauthn/register")
     .json(request)
     .post()
-    .json<TokenResponse>()
+    .badRequest(() => null)
+    .json<oauth.TokenEndpointResponse>()
 }
 
 /**
- * Get a challenge to authenticate as a given account ID.
+ * Get a challenge to authenticate using the given credential ID.
  */
 export const getWebAuthnAuthenticationChallenge = async (
   wretch: Wretch,
   credentialId: string
-): Promise<WebAuthChallenge> => {
+): Promise<WebAuthnChallenge> => {
   return await wretch
-    .url("/auth/webauthn")
-    .addon(queryStringAddon)
-    .query({ credential_id: credentialId })
+    .url(`/auth/webauthn/authenticate/${credentialId}`)
     .get()
-    .json<WebAuthChallenge>()
+    .json<WebAuthnChallenge>()
 }
 
 /**
@@ -113,11 +107,12 @@ export const getWebAuthnAuthenticationChallenge = async (
  */
 export const completeWebAuthnAuthentication = async (
   wretch: Wretch,
-  request: WebAuthnAuthenticationRequest
-): Promise<TokenResponse> => {
+  request: WebAuthnChallengeResult
+): Promise<oauth.TokenEndpointResponse | null> => {
   return await wretch
-    .url("/auth/webauthn")
+    .url("/auth/webauthn/authenticate")
     .json(request)
     .post()
-    .json<TokenResponse>()
+    .forbidden(() => null)
+    .json<oauth.TokenEndpointResponse>()
 }

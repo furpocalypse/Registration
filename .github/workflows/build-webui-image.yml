@@ -1,0 +1,41 @@
+name: Build registration web UI image
+on:
+  push:
+    paths:
+      - js/**
+    branches:
+      - monorepo
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - uses: actions/checkout@v3.5.3
+
+      - name: Setup Docker buildx
+        uses: docker/setup-buildx-action@v2.9.1
+
+      - uses: docker/login-action@v2.2.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v4.6.0
+        with:
+          images: ghcr.io/open-event-systems/registration-webui
+          tags: |
+            type=raw,value=dev
+
+      - uses: docker/build-push-action@v4.1.1
+        with:
+          context: js
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
